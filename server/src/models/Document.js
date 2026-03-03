@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const documentSchema = new mongoose.Schema(
     {
@@ -118,4 +118,4 @@ documentSchema.methods.saveVersion = async function (userId, description = '') {
     await this.save();
 };
 
-module.exports = mongoose.model('Document', documentSchema);
+export default mongoose.model('Document', documentSchema);

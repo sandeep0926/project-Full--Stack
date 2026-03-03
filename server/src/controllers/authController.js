@@ -1,14 +1,15 @@
-const User = require('../models/User');
-const AuditLog = require('../models/AuditLog');
-const { generateAccessToken, generateRefreshToken, verifyRefreshToken, generateSecureToken, hashToken } = require('../utils/tokens');
-const { sendVerificationEmail, sendPasswordResetEmail, sendOTPEmail } = require('../utils/email');
-const { AuthenticationError, ValidationError, NotFoundError, ConflictError } = require('../utils/errors');
-const speakeasy = require('speakeasy');
-const logger = require('../utils/logger');
+import User from '../models/User.js';
+import AuditLog from '../models/AuditLog.js';
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken, generateSecureToken, hashToken } from '../utils/tokens.js';
+import { sendVerificationEmail, sendPasswordResetEmail, sendOTPEmail } from '../utils/email.js';
+import { sendSms } from '../utils/sms.js';
+import { AuthenticationError, ValidationError, NotFoundError, ConflictError } from '../utils/errors.js';
+import speakeasy from 'speakeasy';
+import logger from '../utils/logger.js';
 
 // @desc Register user
 // @route POST /api/v1/auth/register
-exports.register = async (req, res, next) => {
+export const register = async (req, res, next) => {
     try {
         const { name, email, password } = req.body;
 
@@ -67,7 +68,7 @@ exports.register = async (req, res, next) => {
 
 // @desc Login user
 // @route POST /api/v1/auth/login
-exports.login = async (req, res, next) => {
+export const login = async (req, res, next) => {
     try {
         const { email, password } = req.body;
 
@@ -95,7 +96,7 @@ exports.login = async (req, res, next) => {
 
         // Check MFA
         if (user.mfaEnabled) {
-            // Generate OTP and send via email
+            // Generate OTP and send via email/SMS
             const otp = speakeasy.totp({
                 secret: user.mfaSecret || speakeasy.generateSecret().base32,
                 encoding: 'base32',
@@ -106,16 +107,30 @@ exports.login = async (req, res, next) => {
             user.otpExpires = new Date(Date.now() + 5 * 60 * 1000);
             await user.save();
 
+            // For development: log OTP to terminal so you can see it
+            if (process.env.NODE_ENV !== 'production') {
+                logger.info(`MFA OTP for ${user.email}: ${otp}`);
+            }
+
             sendOTPEmail(user, otp).catch((err) =>
                 logger.error(`OTP email failed: ${err.message}`)
             );
+
+            if (user.phoneNumber) {
+                sendSms({
+                    to: user.phoneNumber,
+                    body: `Your Enterprise Platform OTP is ${otp}. It expires in 5 minutes.`,
+                }).catch((err) =>
+                    logger.error(`OTP SMS failed: ${err.message}`)
+                );
+            }
 
             return res.status(200).json({
                 success: true,
                 data: {
                     requiresMFA: true,
                     userId: user._id,
-                    message: 'OTP sent to your email',
+                    message: 'OTP sent to your email/SMS',
                 },
             });
         }
@@ -181,7 +196,7 @@ exports.login = async (req, res, next) => {
 
 // @desc Verify MFA OTP
 // @route POST /api/v1/auth/verify-mfa
-exports.verifyMFA = async (req, res, next) => {
+export const verifyMFA = async (req, res, next) => {
     try {
         const { userId, otp } = req.body;
 
@@ -228,7 +243,7 @@ exports.verifyMFA = async (req, res, next) => {
 
 // @desc Enable MFA
 // @route POST /api/v1/auth/enable-mfa
-exports.enableMFA = async (req, res, next) => {
+export const enableMFA = async (req, res, next) => {
     try {
         const user = await User.findById(req.user._id);
         const secret = speakeasy.generateSecret({ name: `EnterprisePlatform:${user.email}` });
@@ -261,7 +276,7 @@ exports.enableMFA = async (req, res, next) => {
 
 // @desc Refresh token
 // @route POST /api/v1/auth/refresh-token
-exports.refreshToken = async (req, res, next) => {
+export const refreshToken = async (req, res, next) => {
     try {
         const { refreshToken: token } = req.body;
         if (!token) {
@@ -301,7 +316,7 @@ exports.refreshToken = async (req, res, next) => {
 
 // @desc Forgot password
 // @route POST /api/v1/auth/forgot-password
-exports.forgotPassword = async (req, res, next) => {
+export const forgotPassword = async (req, res, next) => {
     try {
         const { email } = req.body;
         const user = await User.findOne({ email });
@@ -334,7 +349,7 @@ exports.forgotPassword = async (req, res, next) => {
 
 // @desc Reset password
 // @route PUT /api/v1/auth/reset-password/:token
-exports.resetPassword = async (req, res, next) => {
+export const resetPassword = async (req, res, next) => {
     try {
         const hashedToken = hashToken(req.params.token);
 
@@ -373,7 +388,7 @@ exports.resetPassword = async (req, res, next) => {
 
 // @desc Verify email
 // @route GET /api/v1/auth/verify-email/:token
-exports.verifyEmail = async (req, res, next) => {
+export const verifyEmail = async (req, res, next) => {
     try {
         const hashedToken = hashToken(req.params.token);
 
@@ -402,7 +417,7 @@ exports.verifyEmail = async (req, res, next) => {
 
 // @desc Get current user
 // @route GET /api/v1/auth/me
-exports.getMe = async (req, res, next) => {
+export const getMe = async (req, res, next) => {
     try {
         const user = await User.findById(req.user._id).populate('tenantId', 'name slug');
 
@@ -417,7 +432,7 @@ exports.getMe = async (req, res, next) => {
 
 // @desc Logout
 // @route POST /api/v1/auth/logout
-exports.logout = async (req, res, next) => {
+export const logout = async (req, res, next) => {
     try {
         const { deviceId } = req.body;
 
@@ -447,7 +462,7 @@ exports.logout = async (req, res, next) => {
 
 // @desc Get user devices
 // @route GET /api/v1/auth/devices
-exports.getDevices = async (req, res, next) => {
+export const getDevices = async (req, res, next) => {
     try {
         const user = await User.findById(req.user._id);
         const devices = user.devices.map((d) => ({
@@ -470,7 +485,7 @@ exports.getDevices = async (req, res, next) => {
 
 // @desc Revoke device
 // @route DELETE /api/v1/auth/devices/:deviceId
-exports.revokeDevice = async (req, res, next) => {
+export const revokeDevice = async (req, res, next) => {
     try {
         const user = await User.findById(req.user._id);
         user.devices = user.devices.filter((d) => d.deviceId !== req.params.deviceId);
@@ -487,7 +502,7 @@ exports.revokeDevice = async (req, res, next) => {
 
 // @desc Google OAuth callback
 // @route GET /api/v1/auth/google/callback
-exports.googleCallback = async (req, res, next) => {
+export const googleCallback = async (req, res, next) => {
     try {
         const user = req.user;
         const accessToken = generateAccessToken(user);
@@ -509,4 +524,20 @@ exports.googleCallback = async (req, res, next) => {
     } catch (error) {
         next(error);
     }
+};
+
+export default {
+    register,
+    login,
+    verifyMFA,
+    enableMFA,
+    refreshToken,
+    forgotPassword,
+    resetPassword,
+    verifyEmail,
+    getMe,
+    logout,
+    getDevices,
+    revokeDevice,
+    googleCallback,
 };

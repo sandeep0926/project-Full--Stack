@@ -1,25 +1,24 @@
-// API v2 - Re-exports v1 routes with v2 health check
-const express = require('express');
-const router = express.Router();
+import { Router } from 'express';
+import authRoutes from '../v1/auth.js';
+import tenantRoutes from '../v1/tenants.js';
+import documentRoutes from '../v1/documents.js';
+import productRoutes from '../v1/products.js';
+import orderRoutes from '../v1/orders.js';
+import analyticsRoutes from '../v1/analytics.js';
 
-// v2 re-uses v1 routes for backward compatibility
-router.use('/auth', require('../v1/auth'));
-router.use('/tenants', require('../v1/tenants'));
-router.use('/documents', require('../v1/documents'));
-router.use('/products', require('../v1/products'));
-router.use('/orders', require('../v1/orders'));
-router.use('/analytics', require('../v1/analytics'));
+const router = Router();
 
-// v2 health check
+// V2 reuses v1 routes with additional enhancements
+router.use('/auth', authRoutes);
+router.use('/tenants', tenantRoutes);
+router.use('/documents', documentRoutes);
+router.use('/products', productRoutes);
+router.use('/orders', orderRoutes);
+router.use('/analytics', analyticsRoutes);
+
+// V2 specific endpoints
 router.get('/health', (req, res) => {
-    res.json({
-        success: true,
-        data: {
-            version: 'v2',
-            status: 'operational',
-            timestamp: new Date().toISOString(),
-        },
-    });
+    res.json({ success: true, data: { version: 'v2', status: 'operational' } });
 });
 
-module.exports = router;
+export default router;

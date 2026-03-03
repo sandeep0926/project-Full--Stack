@@ -1,10 +1,10 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const passport = require('passport');
-const auth = require('../../controllers/authController');
-const { authenticate } = require('../../middleware/auth');
-const { authLimiter, passwordResetLimiter } = require('../../middleware/rateLimiter');
-const { registerRules, loginRules, validate } = require('../../middleware/validate');
+import passport from 'passport';
+import auth from '../../controllers/authController.js';
+import { authenticate } from '../../middleware/auth.js';
+import { authLimiter, passwordResetLimiter } from '../../middleware/rateLimiter.js';
+import { registerRules, loginRules, validate } from '../../middleware/validate.js';
 
 router.post('/register', authLimiter, registerRules, validate, auth.register);
 router.post('/login', authLimiter, loginRules, validate, auth.login);
@@ -25,4 +25,4 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     router.get('/google/callback', passport.authenticate('google', { session: false, failureRedirect: '/login' }), auth.googleCallback);
 }
 
-module.exports = router;
+export default router;

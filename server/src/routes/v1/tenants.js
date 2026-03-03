@@ -1,7 +1,7 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const tenant = require('../../controllers/tenantController');
-const { authenticate, authorize, tenantIsolation } = require('../../middleware/auth');
+import tenant from '../../controllers/tenantController.js';
+import { authenticate, authorize, tenantIsolation } from '../../middleware/auth.js';
 
 router.use(authenticate);
 router.post('/', tenant.createTenant);
@@ -12,4 +12,4 @@ router.delete('/members/:userId', tenantIsolation, authorize('admin', 'superadmi
 router.put('/members/:userId/role', tenantIsolation, authorize('admin', 'superadmin'), tenant.updateMemberRole);
 router.get('/', authorize('superadmin'), tenant.getAllTenants);
 
-module.exports = router;
+export default router;

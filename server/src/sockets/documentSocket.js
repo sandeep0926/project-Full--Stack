@@ -1,6 +1,7 @@
-const Document = require('../models/Document');
-const { verifyAccessToken } = require('../utils/tokens');
-const logger = require('../utils/logger');
+import Document from '../models/Document.js';
+import { verifyAccessToken } from '../utils/tokens.js';
+import logger from '../utils/logger.js';
+import { enqueueDocumentJob } from '../jobs/queues.js';
 
 const documentColors = [
     '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
@@ -8,6 +9,7 @@ const documentColors = [
 ];
 
 const activeUsers = new Map(); // docId -> Map(userId -> userData)
+const documentVersions = new Map(); // docId -> version counter
 
 const setupSocketHandlers = (io) => {
     // Auth middleware for sockets
@@ -34,6 +36,7 @@ const setupSocketHandlers = (io) => {
             socket.documentId = documentId;
 
             if (!activeUsers.has(documentId)) activeUsers.set(documentId, new Map());
+            if (!documentVersions.has(documentId)) documentVersions.set(documentId, 0);
             const docUsers = activeUsers.get(documentId);
             const colorIndex = docUsers.size % documentColors.length;
             const userData = { userId: socket.userId, name: socket.userName, color: documentColors[colorIndex], cursor: null };
@@ -46,11 +49,28 @@ const setupSocketHandlers = (io) => {
             logger.info(`User ${socket.userId} joined document ${documentId}`);
         });
 
-        // Handle text changes (Operational Transformation)
+        // Handle text changes with basic versioning for conflict detection
         socket.on('text-change', async (data) => {
-            const { documentId, delta, source } = data;
-            // Broadcast to other users in the document
-            socket.to(documentId).emit('text-change', { delta, userId: socket.userId, source });
+            const { documentId, delta, source, clientVersion } = data;
+
+            const currentVersion = documentVersions.get(documentId) ?? 0;
+            if (typeof clientVersion === 'number' && clientVersion !== currentVersion) {
+                socket.emit('sync-required', {
+                    documentId,
+                    serverVersion: currentVersion,
+                });
+            }
+
+            const nextVersion = currentVersion + 1;
+            documentVersions.set(documentId, nextVersion);
+
+            // Broadcast to other users in the document, including updated version
+            socket.to(documentId).emit('text-change', {
+                delta,
+                userId: socket.userId,
+                source,
+                version: nextVersion,
+            });
         });
 
         // Handle cursor position updates
@@ -63,7 +83,7 @@ const setupSocketHandlers = (io) => {
             socket.to(documentId).emit('cursor-change', { userId: socket.userId, range, name: socket.userName, color: docUsers?.get(socket.userId)?.color });
         });
 
-        // Auto-save
+        // Auto-save + background processing
         socket.on('save-document', async (data) => {
             try {
                 const { documentId, content, plainText } = data;
@@ -74,6 +94,10 @@ const setupSocketHandlers = (io) => {
                     doc.lastEditedBy = socket.userId;
                     doc.wordCount = plainText ? plainText.split(/\s+/).filter(Boolean).length : 0;
                     await doc.save();
+
+                    // enqueue heavy processing in background
+                    enqueueDocumentJob('analyze', { documentId: doc._id.toString() }).catch(() => {});
+
                     socket.emit('save-success', { documentId, version: doc.currentVersion });
                     socket.to(documentId).emit('document-saved', { savedBy: socket.userName });
                 }
@@ -107,4 +131,4 @@ function handleLeave(socket, documentId, io) {
     }
 }
 
-module.exports = setupSocketHandlers;
+export default setupSocketHandlers;

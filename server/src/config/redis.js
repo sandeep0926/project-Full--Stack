@@ -1,5 +1,5 @@
-const Redis = require('ioredis');
-const logger = require('../utils/logger');
+import Redis from 'ioredis';
+import logger from '../utils/logger.js';
 
 let redisClient = null;
 let redisAvailable = false;
@@ -76,7 +76,7 @@ const cacheFlushPattern = async (pattern) => {
     } catch { }
 };
 
-module.exports = {
+export {
     createRedisClient,
     getRedisClient,
     isRedisAvailable,

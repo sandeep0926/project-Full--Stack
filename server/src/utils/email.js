@@ -1,7 +1,17 @@
-const nodemailer = require('nodemailer');
-const logger = require('./logger');
+import nodemailer from 'nodemailer';
+import logger from './logger.js';
+
+let emailDisabledLogged = false;
 
 const createTransporter = () => {
+    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        if (!emailDisabledLogged) {
+            logger.warn('Email transport not configured (SMTP_* env vars missing) - skipping email sends');
+            emailDisabledLogged = true;
+        }
+        return null;
+    }
+
     return nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: process.env.SMTP_PORT,
@@ -13,8 +23,10 @@ const createTransporter = () => {
 };
 
 const sendEmail = async ({ to, subject, html, text }) => {
+    const transporter = createTransporter();
+    if (!transporter) return;
+
     try {
-        const transporter = createTransporter();
         const info = await transporter.sendMail({
             from: `"Enterprise Platform" <${process.env.EMAIL_FROM}>`,
             to,
@@ -86,7 +98,7 @@ const sendOTPEmail = async (user, otp) => {
     });
 };
 
-module.exports = {
+export {
     sendEmail,
     sendVerificationEmail,
     sendPasswordResetEmail,

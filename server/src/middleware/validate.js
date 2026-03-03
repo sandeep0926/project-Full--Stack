@@ -1,5 +1,5 @@
-const { validationResult, check, body, param, query } = require('express-validator');
-const { ValidationError } = require('../utils/errors');
+import { validationResult, check, body, param, query } from 'express-validator';
+import { ValidationError } from '../utils/errors.js';
 
 // Middleware to check validation results
 const validate = (req, res, next) => {
@@ -70,7 +70,7 @@ const idParamRule = [
     param('id').isMongoId().withMessage('Invalid resource ID'),
 ];
 
-module.exports = {
+export {
     validate,
     registerRules,
     loginRules,

@@ -1,6 +1,7 @@
-const passport = require('passport');
-const { AuthenticationError, AuthorizationError } = require('../utils/errors');
-const { cacheGet } = require('../config/redis');
+import passport from 'passport';
+import { AuthenticationError, AuthorizationError } from '../utils/errors.js';
+import { cacheGet } from '../config/redis.js';
+import Tenant from '../models/Tenant.js';
 
 // Authenticate using JWT
 const authenticate = (req, res, next) => {
@@ -52,7 +53,6 @@ const requireFeature = (feature) => {
             return next(new AuthenticationError('Please login first'));
         }
         try {
-            const Tenant = require('../models/Tenant');
             const tenant = await Tenant.findById(req.user.tenantId);
             if (!tenant) {
                 return next(new AuthorizationError('Tenant not found'));
@@ -91,7 +91,7 @@ const optionalAuth = (req, res, next) => {
     })(req, res, next);
 };
 
-module.exports = {
+export {
     authenticate,
     authorize,
     requireSubscription,

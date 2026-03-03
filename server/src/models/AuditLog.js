@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const auditLogSchema = new mongoose.Schema(
     {
@@ -67,4 +67,4 @@ auditLogSchema.statics.logAction = async function (data) {
     return this.create(data);
 };
 
-module.exports = mongoose.model('AuditLog', auditLogSchema);
+export default mongoose.model('AuditLog', auditLogSchema);

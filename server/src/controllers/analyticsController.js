@@ -1,20 +1,30 @@
-const AnalyticsEvent = require('../models/AnalyticsEvent');
-const { cacheGet, cacheSet } = require('../config/redis');
+import AnalyticsEvent from '../models/AnalyticsEvent.js';
+import { cacheGet, cacheSet } from '../config/redis.js';
+import { enqueueAnalyticsEvent } from '../jobs/queues.js';
 
-exports.trackEvent = async (req, res, next) => {
+export const trackEvent = async (req, res, next) => {
     try {
-        const event = await AnalyticsEvent.create({
+        const payload = {
             ...req.body,
             userId: req.user?._id,
             tenantId: req.user?.tenantId,
             geo: { ip: req.ip },
             device: { browser: req.get('user-agent') },
-        });
+        };
+
+        const event = await AnalyticsEvent.create(payload);
+
+        // Simulate event-driven processing pipeline
+        enqueueAnalyticsEvent({
+            ...payload,
+            id: event._id.toString(),
+        }).catch(() => {});
+
         res.status(201).json({ success: true, data: { event } });
     } catch (error) { next(error); }
 };
 
-exports.getDashboard = async (req, res, next) => {
+export const getDashboard = async (req, res, next) => {
     try {
         const { period = '7d' } = req.query;
         const cacheKey = `analytics:dashboard:${req.user?.tenantId || 'all'}:${period}`;
@@ -73,7 +83,7 @@ exports.getDashboard = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
-exports.getRealtimeStats = async (req, res, next) => {
+export const getRealtimeStats = async (req, res, next) => {
     try {
         const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
         const tenantMatch = req.user?.tenantId ? { tenantId: req.user.tenantId } : {};
@@ -88,7 +98,7 @@ exports.getRealtimeStats = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
-exports.exportData = async (req, res, next) => {
+export const exportData = async (req, res, next) => {
     try {
         const { startDate, endDate, format = 'csv' } = req.query;
         const query = {};
@@ -109,11 +119,51 @@ exports.exportData = async (req, res, next) => {
             return res.send(csv);
         }
 
+        if (format === 'excel') {
+            const { default: ExcelJS } = await import('exceljs');
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('Analytics');
+
+            worksheet.columns = [
+                { header: 'Date', key: 'date', width: 24 },
+                { header: 'Event Type', key: 'eventType', width: 20 },
+                { header: 'User ID', key: 'userId', width: 24 },
+                { header: 'Page', key: 'page', width: 32 },
+                { header: 'Revenue', key: 'revenue', width: 12 },
+                { header: 'Device', key: 'device', width: 12 },
+                { header: 'Country', key: 'country', width: 16 },
+            ];
+
+            events.forEach((e) => {
+                worksheet.addRow({
+                    date: e.createdAt?.toISOString(),
+                    eventType: e.eventType,
+                    userId: e.userId?.toString(),
+                    page: e.page || '',
+                    revenue: e.revenue || 0,
+                    device: e.device?.type || '',
+                    country: e.geo?.country || '',
+                });
+            });
+
+            res.setHeader(
+                'Content-Type',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            );
+            res.setHeader(
+                'Content-Disposition',
+                'attachment; filename=analytics_export.xlsx'
+            );
+
+            await workbook.xlsx.write(res);
+            return res.end();
+        }
+
         res.status(200).json({ success: true, data: { events } });
     } catch (error) { next(error); }
 };
 
-exports.getConversionFunnel = async (req, res, next) => {
+export const getConversionFunnel = async (req, res, next) => {
     try {
         const { period = '30d' } = req.query;
         const days = parseInt(period) || 30;
@@ -128,4 +178,12 @@ exports.getConversionFunnel = async (req, res, next) => {
 
         res.status(200).json({ success: true, data: { funnel } });
     } catch (error) { next(error); }
+};
+
+export default {
+    trackEvent,
+    getDashboard,
+    getRealtimeStats,
+    exportData,
+    getConversionFunnel,
 };

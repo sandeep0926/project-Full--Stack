@@ -1,11 +1,11 @@
-const Product = require('../models/Product');
-const AuditLog = require('../models/AuditLog');
-const { cacheGet, cacheSet, cacheDel, cacheFlushPattern } = require('../config/redis');
-const { NotFoundError, ValidationError } = require('../utils/errors');
+import Product from '../models/Product.js';
+import AuditLog from '../models/AuditLog.js';
+import { cacheGet, cacheSet, cacheDel, cacheFlushPattern } from '../config/redis.js';
+import { NotFoundError, ValidationError } from '../utils/errors.js';
 
 // @desc Create product
 // @route POST /api/v1/products
-exports.createProduct = async (req, res, next) => {
+export const createProduct = async (req, res, next) => {
     try {
         const slug = req.body.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
@@ -41,7 +41,7 @@ exports.createProduct = async (req, res, next) => {
 
 // @desc Get all products
 // @route GET /api/v1/products
-exports.getProducts = async (req, res, next) => {
+export const getProducts = async (req, res, next) => {
     try {
         const {
             page = 1,
@@ -109,7 +109,7 @@ exports.getProducts = async (req, res, next) => {
 
 // @desc Get single product
 // @route GET /api/v1/products/:id
-exports.getProduct = async (req, res, next) => {
+export const getProduct = async (req, res, next) => {
     try {
         const cacheKey = `product:${req.params.id}`;
         let product = await cacheGet(cacheKey);
@@ -131,7 +131,7 @@ exports.getProduct = async (req, res, next) => {
 
 // @desc Update product
 // @route PUT /api/v1/products/:id
-exports.updateProduct = async (req, res, next) => {
+export const updateProduct = async (req, res, next) => {
     try {
         const product = await Product.findByIdAndUpdate(req.params.id, req.body, {
             new: true,
@@ -166,7 +166,7 @@ exports.updateProduct = async (req, res, next) => {
 
 // @desc Delete product
 // @route DELETE /api/v1/products/:id
-exports.deleteProduct = async (req, res, next) => {
+export const deleteProduct = async (req, res, next) => {
     try {
         const product = await Product.findByIdAndUpdate(
             req.params.id,
@@ -202,7 +202,7 @@ exports.deleteProduct = async (req, res, next) => {
 
 // @desc Get product categories
 // @route GET /api/v1/products/categories
-exports.getCategories = async (req, res, next) => {
+export const getCategories = async (req, res, next) => {
     try {
         const cacheKey = 'product:categories';
         let categories = await cacheGet(cacheKey);
@@ -223,7 +223,7 @@ exports.getCategories = async (req, res, next) => {
 
 // @desc Check inventory
 // @route GET /api/v1/products/:id/inventory
-exports.checkInventory = async (req, res, next) => {
+export const checkInventory = async (req, res, next) => {
     try {
         const product = await Product.findById(req.params.id)
             .select('name sku inventory');
@@ -242,4 +242,14 @@ exports.checkInventory = async (req, res, next) => {
     } catch (error) {
         next(error);
     }
+};
+
+export default {
+    createProduct,
+    getProducts,
+    getProduct,
+    updateProduct,
+    deleteProduct,
+    getCategories,
+    checkInventory,
 };

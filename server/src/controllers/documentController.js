@@ -1,12 +1,12 @@
-const Document = require('../models/Document');
-const AuditLog = require('../models/AuditLog');
-const { cacheGet, cacheSet, cacheDel } = require('../config/redis');
-const { NotFoundError, AuthorizationError } = require('../utils/errors');
-const { generateSecureToken } = require('../utils/tokens');
+import Document from '../models/Document.js';
+import AuditLog from '../models/AuditLog.js';
+import { cacheGet, cacheSet, cacheDel } from '../config/redis.js';
+import { NotFoundError, AuthorizationError } from '../utils/errors.js';
+import { generateSecureToken } from '../utils/tokens.js';
 
 // @desc Create document
 // @route POST /api/v1/documents
-exports.createDocument = async (req, res, next) => {
+export const createDocument = async (req, res, next) => {
     try {
         const doc = await Document.create({
             title: req.body.title || 'Untitled Document',
@@ -38,7 +38,7 @@ exports.createDocument = async (req, res, next) => {
 
 // @desc Get all documents (user's owned + shared)
 // @route GET /api/v1/documents
-exports.getDocuments = async (req, res, next) => {
+export const getDocuments = async (req, res, next) => {
     try {
         const { page = 1, limit = 20, search, sort = '-updatedAt' } = req.query;
 
@@ -84,7 +84,7 @@ exports.getDocuments = async (req, res, next) => {
 
 // @desc Get single document
 // @route GET /api/v1/documents/:id
-exports.getDocument = async (req, res, next) => {
+export const getDocument = async (req, res, next) => {
     try {
         const cacheKey = `doc:${req.params.id}`;
         let doc = await cacheGet(cacheKey);
@@ -125,7 +125,7 @@ exports.getDocument = async (req, res, next) => {
 
 // @desc Update document
 // @route PUT /api/v1/documents/:id
-exports.updateDocument = async (req, res, next) => {
+export const updateDocument = async (req, res, next) => {
     try {
         const doc = await Document.findById(req.params.id);
         if (!doc || doc.isDeleted) {
@@ -171,7 +171,7 @@ exports.updateDocument = async (req, res, next) => {
 
 // @desc Share document
 // @route POST /api/v1/documents/:id/share
-exports.shareDocument = async (req, res, next) => {
+export const shareDocument = async (req, res, next) => {
     try {
         const doc = await Document.findById(req.params.id);
         if (!doc || doc.isDeleted) throw new NotFoundError('Document');
@@ -225,7 +225,7 @@ exports.shareDocument = async (req, res, next) => {
 
 // @desc Generate share link
 // @route POST /api/v1/documents/:id/share-link
-exports.generateShareLink = async (req, res, next) => {
+export const generateShareLink = async (req, res, next) => {
     try {
         const doc = await Document.findById(req.params.id);
         if (!doc || doc.isDeleted) throw new NotFoundError('Document');
@@ -255,7 +255,7 @@ exports.generateShareLink = async (req, res, next) => {
 
 // @desc Get document versions
 // @route GET /api/v1/documents/:id/versions
-exports.getVersions = async (req, res, next) => {
+export const getVersions = async (req, res, next) => {
     try {
         const doc = await Document.findById(req.params.id)
             .select('versions currentVersion')
@@ -277,7 +277,7 @@ exports.getVersions = async (req, res, next) => {
 
 // @desc Restore document version
 // @route PUT /api/v1/documents/:id/versions/:versionNumber
-exports.restoreVersion = async (req, res, next) => {
+export const restoreVersion = async (req, res, next) => {
     try {
         const doc = await Document.findById(req.params.id);
         if (!doc) throw new NotFoundError('Document');
@@ -307,7 +307,7 @@ exports.restoreVersion = async (req, res, next) => {
 
 // @desc Delete document (soft delete)
 // @route DELETE /api/v1/documents/:id
-exports.deleteDocument = async (req, res, next) => {
+export const deleteDocument = async (req, res, next) => {
     try {
         const doc = await Document.findById(req.params.id);
         if (!doc) throw new NotFoundError('Document');
@@ -341,4 +341,16 @@ exports.deleteDocument = async (req, res, next) => {
     } catch (error) {
         next(error);
     }
+};
+
+export default {
+    createDocument,
+    getDocuments,
+    getDocument,
+    updateDocument,
+    shareDocument,
+    generateShareLink,
+    getVersions,
+    restoreVersion,
+    deleteDocument,
 };

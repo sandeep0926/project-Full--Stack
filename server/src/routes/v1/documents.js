@@ -1,8 +1,9 @@
-const express = require('express');
+import express from 'express';
+import doc from '../../controllers/documentController.js';
+import { authenticate } from '../../middleware/auth.js';
+import { documentRules, paginationRules, idParamRule, validate } from '../../middleware/validate.js';
+
 const router = express.Router();
-const doc = require('../../controllers/documentController');
-const { authenticate } = require('../../middleware/auth');
-const { documentRules, paginationRules, idParamRule, validate } = require('../../middleware/validate');
 
 router.use(authenticate);
 router.post('/', documentRules, validate, doc.createDocument);
@@ -15,4 +16,4 @@ router.post('/:id/share-link', idParamRule, validate, doc.generateShareLink);
 router.get('/:id/versions', idParamRule, validate, doc.getVersions);
 router.put('/:id/versions/:versionNumber', doc.restoreVersion);
 
-module.exports = router;
+export default router;

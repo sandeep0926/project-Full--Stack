@@ -1,13 +1,13 @@
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-require('dotenv').config();
+import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
+import 'dotenv/config';
 
-const User = require('../models/User');
-const Tenant = require('../models/Tenant');
-const Product = require('../models/Product');
-const AnalyticsEvent = require('../models/AnalyticsEvent');
+import User from '../models/User.js';
+import Tenant from '../models/Tenant.js';
+import Product from '../models/Product.js';
+import AnalyticsEvent from '../models/AnalyticsEvent.js';
 
-const connectDB = require('../config/database');
+import connectDB from '../config/database.js';
 
 const seedData = async () => {
     await connectDB();

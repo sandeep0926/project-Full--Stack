@@ -1,5 +1,5 @@
-const rateLimit = require('express-rate-limit');
-const { RateLimitError } = require('../utils/errors');
+import rateLimit from 'express-rate-limit';
+import { RateLimitError } from '../utils/errors.js';
 
 // General API rate limiter
 const apiLimiter = rateLimit({
@@ -37,7 +37,7 @@ const uploadLimiter = rateLimit({
     message: { success: false, error: { message: 'Upload limit exceeded', code: 'UPLOAD_LIMIT' } },
 });
 
-module.exports = {
+export {
     apiLimiter,
     authLimiter,
     passwordResetLimiter,

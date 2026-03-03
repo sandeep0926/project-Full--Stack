@@ -1,8 +1,10 @@
-const passport = require('passport');
-const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
-const { Strategy: JwtStrategy, ExtractJwt } = require('passport-jwt');
-const User = require('../models/User');
-const logger = require('../utils/logger');
+import passport from 'passport';
+import passportGoogle from 'passport-google-oauth20';
+const GoogleStrategy = passportGoogle.Strategy;
+import pkg from 'passport-jwt';
+const { Strategy: JwtStrategy, ExtractJwt } = pkg;
+import User from '../models/User.js';
+import logger from '../utils/logger.js';
 
 // JWT Strategy
 const jwtOptions = {
@@ -91,4 +93,4 @@ passport.deserializeUser(async (id, done) => {
     }
 });
 
-module.exports = passport;
+export default passport;

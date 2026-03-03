@@ -1,5 +1,5 @@
-const AuditLog = require('../models/AuditLog');
-const logger = require('../utils/logger');
+import AuditLog from '../models/AuditLog.js';
+import logger from '../utils/logger.js';
 
 const auditMiddleware = (action, category) => {
     return async (req, res, next) => {
@@ -58,4 +58,4 @@ const getResourceType = (url) => {
     return segments[2] || 'unknown';
 };
 
-module.exports = auditMiddleware;
+export default auditMiddleware;

@@ -1,3 +1,38 @@
+version: '3.9'
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+
+  server:
+    build: ./server
+    restart: unless-stopped
+    env_file:
+      - ./server/.env
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/enterprise-platform
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    ports:
+      - '5000:5000'
+    depends_on:
+      - mongo
+      - redis
+
+volumes:
+  mongo-data:
+
 version: '3.8'
 
 services:

@@ -1,31 +1,38 @@
-require('dotenv').config();
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const cors = require('cors');
-const helmet = require('helmet');
-const hpp = require('hpp');
-const morgan = require('morgan');
-const compression = require('compression');
-const cookieParser = require('cookie-parser');
-const mongoSanitize = require('express-mongo-sanitize');
+import 'dotenv/config';
+import express from 'express';
+import http from 'http';
+import { Server } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
+import Redis from 'ioredis';
+import cors from 'cors';
+import helmet from 'helmet';
+import hpp from 'hpp';
+import morgan from 'morgan';
+import compression from 'compression';
+import cookieParser from 'cookie-parser';
+import mongoSanitize from 'express-mongo-sanitize';
+import swaggerUi from 'swagger-ui-express';
+import swaggerJsdoc from 'swagger-jsdoc';
+import { setupRecurringJobs } from './jobs/queues.js';
 
-const connectDB = require('./config/database');
-const { createRedisClient } = require('./config/redis');
-const passportConfig = require('./config/passport');
-const { errorHandler, notFound } = require('./middleware/errorHandler');
-const { apiLimiter } = require('./middleware/rateLimiter');
-const setupSocketHandlers = require('./sockets/documentSocket');
-const logger = require('./utils/logger');
+import connectDB from './config/database.js';
+import { createRedisClient } from './config/redis.js';
+import passportConfig from './config/passport.js';
+import { errorHandler, notFound } from './middleware/errorHandler.js';
+import { apiLimiter } from './middleware/rateLimiter.js';
+import setupSocketHandlers from './sockets/documentSocket.js';
+import logger from './utils/logger.js';
 
 // Import routes
-const authRoutes = require('./routes/v1/auth');
-const tenantRoutes = require('./routes/v1/tenants');
-const documentRoutes = require('./routes/v1/documents');
-const productRoutes = require('./routes/v1/products');
-const orderRoutes = require('./routes/v1/orders');
-const analyticsRoutes = require('./routes/v1/analytics');
-const v2Routes = require('./routes/v2/index');
+import authRoutes from './routes/v1/auth.js';
+import tenantRoutes from './routes/v1/tenants.js';
+import documentRoutes from './routes/v1/documents.js';
+import productRoutes from './routes/v1/products.js';
+import orderRoutes from './routes/v1/orders.js';
+import analyticsRoutes from './routes/v1/analytics.js';
+import billingRoutes from './routes/v1/billing.js';
+import paymentRoutes from './routes/v1/payments.js';
+import v2Routes from './routes/v2/index.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -35,6 +42,35 @@ const io = new Server(server, {
     cors: { origin: process.env.CLIENT_URL || 'http://localhost:5173', methods: ['GET', 'POST'], credentials: true },
     pingTimeout: 60000,
 });
+
+// Enable horizontal scaling via Redis adapter (optional, off by default in dev)
+if (process.env.ENABLE_SOCKET_REDIS === 'true') {
+    try {
+        const redisHost = process.env.REDIS_HOST || 'localhost';
+        const redisPort = process.env.REDIS_PORT || 6379;
+        const pubClient = new Redis({
+            host: redisHost,
+            port: redisPort,
+            maxRetriesPerRequest: 1,
+            enableOfflineQueue: false,
+        });
+        const subClient = pubClient.duplicate();
+
+        pubClient.on('error', (err) => {
+            logger.warn(`Socket.io Redis pubClient error: ${err.message}`);
+        });
+        subClient.on('error', (err) => {
+            logger.warn(`Socket.io Redis subClient error: ${err.message}`);
+        });
+
+        io.adapter(createAdapter(pubClient, subClient));
+        logger.info('Socket.io Redis adapter enabled for horizontal scaling');
+    } catch (e) {
+        logger.warn('Socket.io Redis adapter not enabled');
+    }
+} else {
+    logger.info('Socket.io Redis adapter disabled (ENABLE_SOCKET_REDIS != "true")');
+}
 
 // Security middleware
 app.use(helmet({ contentSecurityPolicy: false }));
@@ -60,11 +96,8 @@ app.use(passportConfig.initialize());
 app.use('/api/', apiLimiter);
 
 // Swagger
-let swaggerUi, swaggerSpec;
 try {
-    swaggerUi = require('swagger-ui-express');
-    const swaggerJsdoc = require('swagger-jsdoc');
-    swaggerSpec = swaggerJsdoc({
+    const swaggerSpec = swaggerJsdoc({
         definition: {
             openapi: '3.0.0',
             info: { title: 'Enterprise Platform API', version: '1.0.0', description: 'Full-stack enterprise platform API documentation' },
@@ -86,6 +119,8 @@ app.use('/api/v1/documents', documentRoutes);
 app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
+app.use('/api/v1/billing', billingRoutes);
+app.use('/api/v1/payments', paymentRoutes);
 
 // API Routes v2
 app.use('/api/v2', v2Routes);
@@ -116,7 +151,6 @@ const startServer = async () => {
         } catch (e) { logger.warn('Redis not available - running without cache'); }
 
         try {
-            const { setupRecurringJobs } = require('./jobs/queues');
             setupRecurringJobs();
         } catch (e) { logger.warn('Job queues not available'); }
 
@@ -138,4 +172,4 @@ if (process.env.NODE_ENV !== 'test') {
     startServer();
 }
 
-module.exports = { app, server };
+export { app, server };

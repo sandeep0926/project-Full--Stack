@@ -1,13 +1,13 @@
-const Tenant = require('../models/Tenant');
-const User = require('../models/User');
-const AuditLog = require('../models/AuditLog');
-const { SUBSCRIPTION_PLANS } = require('../config/stripe');
-const { cacheGet, cacheSet, cacheDel } = require('../config/redis');
-const { NotFoundError, AuthorizationError, ConflictError } = require('../utils/errors');
+import Tenant from '../models/Tenant.js';
+import User from '../models/User.js';
+import AuditLog from '../models/AuditLog.js';
+import { SUBSCRIPTION_PLANS } from '../config/stripe.js';
+import { cacheGet, cacheSet, cacheDel } from '../config/redis.js';
+import { NotFoundError, AuthorizationError, ConflictError } from '../utils/errors.js';
 
 // @desc Create tenant
 // @route POST /api/v1/tenants
-exports.createTenant = async (req, res, next) => {
+export const createTenant = async (req, res, next) => {
     try {
         const { name, description } = req.body;
         const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -57,7 +57,7 @@ exports.createTenant = async (req, res, next) => {
 
 // @desc Get current tenant
 // @route GET /api/v1/tenants/current
-exports.getCurrentTenant = async (req, res, next) => {
+export const getCurrentTenant = async (req, res, next) => {
     try {
         const cacheKey = `tenant:${req.user.tenantId}`;
         let tenant = await cacheGet(cacheKey);
@@ -85,7 +85,7 @@ exports.getCurrentTenant = async (req, res, next) => {
 
 // @desc Update tenant
 // @route PUT /api/v1/tenants/current
-exports.updateTenant = async (req, res, next) => {
+export const updateTenant = async (req, res, next) => {
     try {
         const { name, description, settings } = req.body;
 
@@ -135,7 +135,7 @@ exports.updateTenant = async (req, res, next) => {
 
 // @desc Invite member
 // @route POST /api/v1/tenants/members
-exports.inviteMember = async (req, res, next) => {
+export const inviteMember = async (req, res, next) => {
     try {
         const { email, role = 'member' } = req.body;
 
@@ -197,7 +197,7 @@ exports.inviteMember = async (req, res, next) => {
 
 // @desc Remove member
 // @route DELETE /api/v1/tenants/members/:userId
-exports.removeMember = async (req, res, next) => {
+export const removeMember = async (req, res, next) => {
     try {
         const tenant = await Tenant.findById(req.user.tenantId);
         if (!tenant) {
@@ -247,7 +247,7 @@ exports.removeMember = async (req, res, next) => {
 
 // @desc Update member role
 // @route PUT /api/v1/tenants/members/:userId/role
-exports.updateMemberRole = async (req, res, next) => {
+export const updateMemberRole = async (req, res, next) => {
     try {
         const { role } = req.body;
         const tenant = await Tenant.findById(req.user.tenantId);
@@ -287,7 +287,7 @@ exports.updateMemberRole = async (req, res, next) => {
 
 // @desc Get all tenants (superadmin)
 // @route GET /api/v1/tenants
-exports.getAllTenants = async (req, res, next) => {
+export const getAllTenants = async (req, res, next) => {
     try {
         const { page = 1, limit = 20, search } = req.query;
         const query = {};
@@ -322,4 +322,14 @@ exports.getAllTenants = async (req, res, next) => {
     } catch (error) {
         next(error);
     }
+};
+
+export default {
+    createTenant,
+    getCurrentTenant,
+    updateTenant,
+    inviteMember,
+    removeMember,
+    updateMemberRole,
+    getAllTenants,
 };

@@ -1,4 +1,4 @@
-const logger = require('../utils/logger');
+import logger from '../utils/logger.js';
 
 const errorHandler = (err, req, res, next) => {
     let error = { ...err };
@@ -68,4 +68,4 @@ const notFound = (req, res, next) => {
     });
 };
 
-module.exports = { errorHandler, notFound };
+export { errorHandler, notFound };

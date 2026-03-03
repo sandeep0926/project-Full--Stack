@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const tenantSchema = new mongoose.Schema(
     {
@@ -90,4 +90,4 @@ tenantSchema.virtual('memberCount').get(function () {
     return this.members ? this.members.length : 0;
 });
 
-module.exports = mongoose.model('Tenant', tenantSchema);
+export default mongoose.model('Tenant', tenantSchema);

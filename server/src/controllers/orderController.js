@@ -1,10 +1,10 @@
-const mongoose = require('mongoose');
-const Order = require('../models/Order');
-const Product = require('../models/Product');
-const AuditLog = require('../models/AuditLog');
-const { NotFoundError, ValidationError, ConflictError } = require('../utils/errors');
+import mongoose from 'mongoose';
+import Order from '../models/Order.js';
+import Product from '../models/Product.js';
+import AuditLog from '../models/AuditLog.js';
+import { NotFoundError, ValidationError, ConflictError } from '../utils/errors.js';
 
-exports.createOrder = async (req, res, next) => {
+export const createOrder = async (req, res, next) => {
     const session = await mongoose.startSession();
     session.startTransaction();
     try {
@@ -51,7 +51,7 @@ exports.createOrder = async (req, res, next) => {
     }
 };
 
-exports.getOrders = async (req, res, next) => {
+export const getOrders = async (req, res, next) => {
     try {
         const { page = 1, limit = 20, status, sort = '-createdAt' } = req.query;
         const query = { customer: req.user._id };
@@ -66,7 +66,7 @@ exports.getOrders = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
-exports.getOrder = async (req, res, next) => {
+export const getOrder = async (req, res, next) => {
     try {
         const order = await Order.findById(req.params.id).populate('customer', 'name email').populate('items.product', 'name images slug');
         if (!order) throw new NotFoundError('Order');
@@ -75,7 +75,7 @@ exports.getOrder = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
-exports.updateOrderStatus = async (req, res, next) => {
+export const updateOrderStatus = async (req, res, next) => {
     try {
         const { status, note } = req.body;
         const order = await Order.findById(req.params.id);
@@ -105,8 +105,16 @@ exports.updateOrderStatus = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
-exports.cancelOrder = async (req, res, next) => {
+export const cancelOrder = async (req, res, next) => {
     req.body.status = 'canceled';
     req.body.note = req.body.reason || 'Canceled by user';
-    return exports.updateOrderStatus(req, res, next);
+    return updateOrderStatus(req, res, next);
+};
+
+export default {
+    createOrder,
+    getOrders,
+    getOrder,
+    updateOrderStatus,
+    cancelOrder,
 };

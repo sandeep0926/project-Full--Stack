@@ -1,8 +1,8 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const product = require('../../controllers/productController');
-const { authenticate, authorize, tenantIsolation, optionalAuth } = require('../../middleware/auth');
-const { productRules, paginationRules, idParamRule, validate } = require('../../middleware/validate');
+import product from '../../controllers/productController.js';
+import { authenticate, authorize, tenantIsolation, optionalAuth } from '../../middleware/auth.js';
+import { productRules, paginationRules, idParamRule, validate } from '../../middleware/validate.js';
 
 router.get('/', optionalAuth, paginationRules, validate, product.getProducts);
 router.get('/categories', product.getCategories);
@@ -12,4 +12,4 @@ router.post('/', authenticate, authorize('admin', 'superadmin'), productRules, v
 router.put('/:id', authenticate, authorize('admin', 'superadmin'), idParamRule, validate, product.updateProduct);
 router.delete('/:id', authenticate, authorize('admin', 'superadmin'), idParamRule, validate, product.deleteProduct);
 
-module.exports = router;
+export default router;

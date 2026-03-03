@@ -1,7 +1,7 @@
-const dns = require('dns');
+import dns from 'dns';
 dns.setDefaultResultOrder('ipv4first');
-const mongoose = require('mongoose');
-const logger = require('../utils/logger');
+import mongoose from 'mongoose';
+import logger from '../utils/logger.js';
 
 const connectDB = async () => {
     try {
@@ -32,4 +32,4 @@ const connectDB = async () => {
     }
 };
 
-module.exports = connectDB;
+export default connectDB;

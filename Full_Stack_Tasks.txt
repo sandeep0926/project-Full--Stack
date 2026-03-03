@@ -1,0 +1,59 @@
+Advanced / Hard Level Full Stack Practical Tasks (ReactJS, NodeJS, MongoDB)
+These tasks are designed for senior-level (3+ years) full stack developers. Each project requires production-ready architecture, scalability, and security best practices.
+Project 1: Multi-Tenant SaaS Platform
+Requirements:
+• Implement multi-tenant architecture (separate DB or tenant-based isolation)
+• Role-based access control (Super Admin, Admin, User)
+• Subscription plans with recurring billing (Stripe)
+• Feature access control based on subscription
+• Audit logs for user activities
+• API versioning (v1, v2)
+• Performance optimization with caching (Redis)
+• Deploy using Docker + CI/CD pipeline
+Project 2: Real-Time Collaboration System (Like Google Docs)
+Requirements:
+• Real-time editing using WebSockets (Socket.io)
+• Operational transformation or conflict resolution logic
+• Live cursor tracking for multiple users
+• Auto-save with version history
+• Permission-based document sharing
+• Message queue for background processing
+• Horizontal scaling support
+Project 3: Scalable E-Commerce System (High Traffic Ready)
+Requirements:
+• Microservices architecture (Auth, Product, Order, Payment services)
+• API Gateway implementation
+• Load balancing setup
+• Implement rate limiting & advanced security (Helmet, CORS policies)
+• Distributed caching (Redis)
+• Background job queue (Bull/RabbitMQ)
+• Inventory locking system to prevent overselling
+• Database indexing & query optimization
+• Logging & monitoring system
+Project 4: Secure Enterprise Authentication System
+Requirements:
+• OAuth integration (Google login)
+• Multi-factor authentication (OTP via email/SMS)
+• Refresh token rotation strategy
+• Account lockout after failed attempts
+• Password reset flow with secure token expiry
+• Session management & device tracking
+• Security audit logging
+Project 5: Real-Time Analytics Dashboard
+Requirements:
+• Event-driven architecture
+• Stream processing simulation
+• MongoDB aggregation pipelines for analytics
+• Real-time charts updating without refresh
+• Data export (CSV/Excel)
+• Role-based data access
+• Performance testing with large dataset (1M+ records simulation)
+Final Evaluation Criteria
+• Clean architecture implementation
+• Reusable component structure
+• Proper error handling & edge case coverage
+• Unit & integration testing (Jest)
+• API documentation (Swagger)
+• Production-ready deployment
+• Code review readiness
+• Security best practices followed

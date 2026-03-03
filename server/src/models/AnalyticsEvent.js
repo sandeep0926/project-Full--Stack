@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const analyticsEventSchema = new mongoose.Schema(
     {
@@ -77,4 +77,4 @@ analyticsEventSchema.index({ 'geo.country': 1, createdAt: -1 });
 // TTL - auto-delete events older than 1 year
 analyticsEventSchema.index({ createdAt: 1 }, { expireAfterSeconds: 365 * 24 * 60 * 60 });
 
-module.exports = mongoose.model('AnalyticsEvent', analyticsEventSchema);
+export default mongoose.model('AnalyticsEvent', analyticsEventSchema);

@@ -1,4 +1,4 @@
-const Stripe = require('stripe');
+import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
     apiVersion: '2023-10-16',
@@ -63,4 +63,4 @@ const SUBSCRIPTION_PLANS = {
     },
 };
 
-module.exports = { stripe, SUBSCRIPTION_PLANS };
+export { stripe, SUBSCRIPTION_PLANS };
