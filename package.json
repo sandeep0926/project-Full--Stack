@@ -1,0 +1,24 @@
+{
+    "name": "enterprise-fullstack-platform",
+    "version": "1.0.0",
+    "description": "Enterprise Full Stack Platform - Multi-Tenant SaaS, Real-Time Collaboration, E-Commerce, Auth, Analytics",
+    "private": true,
+    "workspaces": [
+        "server",
+        "client"
+    ],
+    "scripts": {
+        "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+        "dev:server": "npm run dev --workspace=server",
+        "dev:client": "npm run dev --workspace=client",
+        "build": "npm run build --workspace=client",
+        "test": "npm run test --workspace=server",
+        "lint": "eslint .",
+        "docker:up": "docker-compose up --build",
+        "docker:down": "docker-compose down",
+        "seed": "npm run seed --workspace=server"
+    },
+    "devDependencies": {
+        "concurrently": "^8.2.2"
+    }
+}
