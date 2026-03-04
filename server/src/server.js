@@ -83,7 +83,21 @@ if (process.env.ENABLE_SOCKET_REDIS === 'true') {
 
 // Security middleware
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
+const allowedOrigins = [
+    process.env.CLIENT_URL,
+    'http://localhost:5173',
+    'https://project-full-stack-client.vercel.app'
+].filter(Boolean);
+app.use(cors({ 
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    }, 
+    credentials: true 
+}));
 app.use(hpp());
 app.use(mongoSanitize());
 
