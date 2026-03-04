@@ -266,7 +266,7 @@ const startServer = async () => {
             setupRecurringJobs();
         } catch (e) { logger.warn('Job queues not available'); }
 
-        server.listen(PORT, () => {
+        server.listen(PORT, '0.0.0.0', () => {
             logger.info(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
             logger.info(`API Docs: http://localhost:${PORT}/api-docs`);
         });
