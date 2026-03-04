@@ -138,6 +138,101 @@ const sendWelcomeEmail = async (user) => {
   });
 };
 
+const sendInvoiceEmail = async (order, customer) => {
+  const orderDate = new Date(order.createdAt).toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+
+  const itemsHtml = order.items.map(item => `
+    <tr>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${item.name}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">$${item.price.toFixed(2)}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">$${item.total.toFixed(2)}</td>
+    </tr>
+  `).join('');
+
+  await sendEmail({
+    to: customer.email,
+    subject: `Invoice for Order ${order.orderNumber}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #6366f1; margin: 0;">INVOICE</h1>
+          <p style="color: #666; margin: 5px 0;">Order #${order.orderNumber}</p>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+          <div style="display: flex; justify-content: space-between;">
+            <div>
+              <h3 style="margin: 0 0 10px 0; color: #333;">Bill To:</h3>
+              <p style="margin: 5px 0; color: #666;">${customer.name}</p>
+              <p style="margin: 5px 0; color: #666;">${customer.email}</p>
+              ${order.shippingAddress ? `
+                <p style="margin: 5px 0; color: #666;">${order.shippingAddress.street || ''}</p>
+                <p style="margin: 5px 0; color: #666;">${order.shippingAddress.city || ''}, ${order.shippingAddress.state || ''} ${order.shippingAddress.zipCode || ''}</p>
+              ` : ''}
+            </div>
+            <div style="text-align: right;">
+              <h3 style="margin: 0 0 10px 0; color: #333;">Invoice Details:</h3>
+              <p style="margin: 5px 0; color: #666;"><strong>Date:</strong> ${orderDate}</p>
+              <p style="margin: 5px 0; color: #666;"><strong>Status:</strong> <span style="color: #10b981;">Paid</span></p>
+              <p style="margin: 5px 0; color: #666;"><strong>Payment Method:</strong> ${order.payment?.method || 'N/A'}</p>
+            </div>
+          </div>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+          <thead>
+            <tr style="background: #f8f9fa;">
+              <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb;">Item</th>
+              <th style="padding: 12px; text-align: center; border-bottom: 2px solid #e5e7eb;">Qty</th>
+              <th style="padding: 12px; text-align: right; border-bottom: 2px solid #e5e7eb;">Price</th>
+              <th style="padding: 12px; text-align: right; border-bottom: 2px solid #e5e7eb;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml}
+          </tbody>
+        </table>
+
+        <div style="text-align: right; margin-bottom: 30px;">
+          <div style="display: inline-block; text-align: left; min-width: 250px;">
+            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+              <span style="color: #666;">Subtotal:</span>
+              <span style="color: #333; font-weight: 500;">$${order.subtotal.toFixed(2)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+              <span style="color: #666;">Tax:</span>
+              <span style="color: #333; font-weight: 500;">$${order.tax.toFixed(2)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+              <span style="color: #666;">Shipping:</span>
+              <span style="color: #333; font-weight: 500;">$${order.shipping.toFixed(2)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-top: 2px solid #6366f1; margin-top: 8px;">
+              <span style="color: #333; font-weight: bold; font-size: 18px;">Total:</span>
+              <span style="color: #6366f1; font-weight: bold; font-size: 18px;">$${order.total.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="background: #f0fdf4; border: 1px solid #86efac; padding: 15px; border-radius: 8px; text-align: center;">
+          <p style="margin: 0; color: #166534; font-weight: 500;">✓ Payment Verified Successfully</p>
+          <p style="margin: 5px 0 0 0; color: #15803d; font-size: 14px;">Thank you for your order!</p>
+        </div>
+
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center;">
+          <p style="color: #666; font-size: 12px; margin: 5px 0;">If you have any questions, please contact our support team.</p>
+          <p style="color: #666; font-size: 12px; margin: 5px 0;">© ${new Date().getFullYear()} Enterprise Platform. All rights reserved.</p>
+        </div>
+      </div>
+    `,
+  });
+};
+
 export {
   sendEmail,
   sendVerificationEmail,
@@ -145,4 +240,5 @@ export {
   sendOTPEmail,
   sendLoginNotificationEmail,
   sendWelcomeEmail,
+  sendInvoiceEmail,
 };

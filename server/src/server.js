@@ -21,6 +21,7 @@ import passportConfig from './config/passport.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import setupSocketHandlers from './sockets/documentSocket.js';
+import setupAnalyticsSocket from './sockets/analyticsSocket.js';
 import logger from './utils/logger.js';
 
 // Import routes
@@ -243,6 +244,10 @@ app.use(errorHandler);
 
 // WebSocket handlers
 setupSocketHandlers(io);
+setupAnalyticsSocket(io);
+
+// Export io for use in controllers
+export { io };
 
 // Start server
 const PORT = process.env.PORT || 5000;

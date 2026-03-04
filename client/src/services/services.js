@@ -51,6 +51,7 @@ export const orderService = {
     getById: (id) => api.get(`/orders/${id}`),
     updateStatus: (id, data) => api.put(`/orders/${id}/status`, data),
     cancel: (id, reason) => api.put(`/orders/${id}/cancel`, { reason }),
+    verifyPayment: (id) => api.post(`/orders/${id}/verify-payment`),
 };
 
 export const paymentService = {

@@ -11,11 +11,14 @@
         "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watchAll",
         "seed": "node src/utils/seeder.js",
         "seed:analytics": "node scripts/seedAnalyticsEvents.js",
-        "swagger": "node src/utils/swaggerGen.js"
+        "swagger": "node src/utils/swaggerGen.js",
+        "perf:seed": "node scripts/performance/seed-large-dataset.js",
+        "perf:load": "node scripts/performance/load-test.js",
+        "perf:benchmark": "node scripts/performance/benchmark.js",
+        "perf:all": "npm run perf:seed && npm run perf:benchmark && npm run perf:load"
     },
     "dependencies": {
         "@socket.io/redis-adapter": "^8.3.0",
-        "exceljs": "^4.4.0",
         "bcryptjs": "^2.4.3",
         "bull": "^4.12.2",
         "compression": "^1.7.4",
@@ -31,6 +34,7 @@
         "helmet": "^7.1.0",
         "hpp": "^0.2.3",
         "ioredis": "^5.3.2",
+        "json2csv": "^6.0.0-alpha.2",
         "jsonwebtoken": "^9.0.2",
         "mongoose": "^8.1.1",
         "morgan": "^1.10.0",

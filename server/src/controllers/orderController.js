@@ -3,6 +3,7 @@ import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import AuditLog from '../models/AuditLog.js';
 import { NotFoundError, ValidationError, ConflictError } from '../utils/errors.js';
+import { sendInvoiceEmail } from '../utils/email.js';
 
 export const createOrder = async (req, res, next) => {
     // Helper to build order data without transactions (standalone MongoDB fallback)
@@ -158,10 +159,65 @@ export const cancelOrder = async (req, res, next) => {
     return updateOrderStatus(req, res, next);
 };
 
+export const verifyPayment = async (req, res, next) => {
+    try {
+        // Only super admin can verify payments
+        if (req.user.role !== 'superadmin') {
+            throw new ValidationError('Only Super Admin can verify payments');
+        }
+
+        const order = await Order.findById(req.params.id).populate('customer', 'name email');
+        if (!order) throw new NotFoundError('Order');
+
+        // Check if payment is already verified
+        if (order.payment?.status === 'paid') {
+            throw new ValidationError('Payment already verified');
+        }
+
+        // Update payment status
+        order.payment = {
+            ...order.payment,
+            status: 'paid',
+            verifiedBy: req.user._id,
+            verifiedAt: new Date(),
+            method: order.payment?.method || 'manual'
+        };
+
+        // Update order status to confirmed if it's still pending
+        if (order.status === 'pending') {
+            order.status = 'confirmed';
+            order.statusHistory.push({
+                status: 'confirmed',
+                changedBy: req.user._id,
+                note: 'Payment verified by Super Admin'
+            });
+        }
+
+        await order.save();
+
+        // Send invoice email to customer
+        try {
+            await sendInvoiceEmail(order, order.customer);
+        } catch (emailError) {
+            // Log email error but don't fail the request
+            console.error('Failed to send invoice email:', emailError);
+        }
+
+        res.status(200).json({ 
+            success: true, 
+            message: 'Payment verified successfully. Invoice sent to customer.',
+            data: { order } 
+        });
+    } catch (error) { 
+        next(error); 
+    }
+};
+
 export default {
     createOrder,
     getOrders,
     getOrder,
     updateOrderStatus,
     cancelOrder,
+    verifyPayment,
 };

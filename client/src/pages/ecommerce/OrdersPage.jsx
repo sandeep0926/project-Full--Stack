@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { orderService, analyticsService } from '../../services/services';
 import { Package, Clock, Truck, CheckCircle, XCircle, ChevronRight, CreditCard } from 'lucide-react';
 import StripePayModal from '../../components/StripePayModal';
+import { useAuth } from '../../context/AuthContext';
 
 const STATUS_CONFIG = {
     pending: { color: 'text-amber-600 bg-amber-50', icon: Clock, label: 'Pending' },
@@ -21,11 +22,19 @@ const PAYMENT_STATUS_CONFIG = {
 };
 
 export default function OrdersPage() {
+    const { user } = useAuth();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('');
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [payOrderId, setPayOrderId] = useState(null);
+    const [verifying, setVerifying] = useState(false);
+
+    // Check if user is Super Admin
+    const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'superadmin';
+    
+    console.log('User role:', user?.role);
+    console.log('Is Super Admin:', isSuperAdmin);
 
     useEffect(() => {
         // Track orders page view
@@ -40,6 +49,25 @@ export default function OrdersPage() {
 
     const viewOrder = async (id) => {
         try { const { data } = await orderService.getById(id); setSelectedOrder(data.data.order); } catch { }
+    };
+
+    const handleVerifyPayment = async () => {
+        if (!selectedOrder) return;
+        
+        try {
+            setVerifying(true);
+            await orderService.verifyPayment(selectedOrder._id);
+            
+            // Refresh order details and list
+            await viewOrder(selectedOrder._id);
+            await fetchOrders();
+            
+            alert('Payment verified successfully! Invoice sent to customer.');
+        } catch (error) {
+            alert(error.response?.data?.message || 'Failed to verify payment');
+        } finally {
+            setVerifying(false);
+        }
     };
 
     return (
@@ -132,10 +160,31 @@ export default function OrdersPage() {
                                     <span className="text-gray-900">Total</span><span className="gradient-text">${selectedOrder.total?.toFixed(2)}</span>
                                 </div>
                             </div>
-                            {selectedOrder.payment?.status !== 'paid' && selectedOrder.status !== 'canceled' && (
+                            {!isSuperAdmin && selectedOrder.payment?.status !== 'paid' && selectedOrder.status !== 'canceled' && (
                                 <button type="button" onClick={() => setPayOrderId(selectedOrder._id)} className="mt-4 w-full py-2.5 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 flex items-center justify-center gap-2">
                                     <CreditCard className="w-4 h-4" /> Pay with Stripe
                                 </button>
+                            )}
+                            {isSuperAdmin && (
+                                <div className="mt-4 p-3 rounded-xl bg-blue-50 border border-blue-100">
+                                    <p className="text-xs font-semibold text-blue-700 mb-1">Payment Status</p>
+                                    <p className="text-sm text-blue-600">
+                                        {selectedOrder.payment?.status === 'paid' ? '✓ Payment Received' : '⚠ Payment Pending'}
+                                    </p>
+                                    {selectedOrder.payment?.method && (
+                                        <p className="text-xs text-blue-500 mt-1">Method: {selectedOrder.payment.method}</p>
+                                    )}
+                                    {selectedOrder.payment?.status !== 'paid' && selectedOrder.status !== 'canceled' && (
+                                        <button 
+                                            type="button" 
+                                            onClick={handleVerifyPayment}
+                                            disabled={verifying}
+                                            className="mt-3 w-full py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            {verifying ? 'Verifying...' : '✓ Verify Payment & Send Invoice'}
+                                        </button>
+                                    )}
+                                </div>
                             )}
                         </div>
                         <button onClick={() => { setSelectedOrder(null); setPayOrderId(null); }} className="mt-6 w-full py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 bg-gray-50 rounded-xl transition-colors">Close</button>

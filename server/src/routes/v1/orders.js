@@ -10,5 +10,6 @@ router.get('/', paginationRules, validate, order.getOrders);
 router.get('/:id', idParamRule, validate, order.getOrder);
 router.put('/:id/status', authorize('admin', 'superadmin'), idParamRule, validate, order.updateOrderStatus);
 router.put('/:id/cancel', idParamRule, validate, order.cancelOrder);
+router.post('/:id/verify-payment', authorize('superadmin'), idParamRule, validate, order.verifyPayment);
 
 export default router;

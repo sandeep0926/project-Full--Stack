@@ -1,6 +1,8 @@
 import AnalyticsEvent from '../models/AnalyticsEvent.js';
 import { cacheGet, cacheSet } from '../config/redis.js';
 import { enqueueAnalyticsEvent } from '../jobs/queues.js';
+import { Parser } from 'json2csv';
+import { emitAnalyticsEvent } from '../sockets/analyticsSocket.js';
 
 export const trackEvent = async (req, res, next) => {
     try {
@@ -19,6 +21,15 @@ export const trackEvent = async (req, res, next) => {
             ...payload,
             id: event._id.toString(),
         }).catch(() => {});
+
+        // Emit real-time event to WebSocket clients
+        try {
+            const { io } = await import('../server.js');
+            emitAnalyticsEvent(io, event.toObject());
+        } catch (err) {
+            // Socket emission is non-critical, log and continue
+            console.error('Failed to emit analytics event:', err.message);
+        }
 
         res.status(201).json({ success: true, data: { event } });
     } catch (error) { next(error); }
@@ -100,22 +111,67 @@ export const getRealtimeStats = async (req, res, next) => {
 
 export const exportData = async (req, res, next) => {
     try {
-        const { startDate, endDate, format = 'csv' } = req.query;
+        const { startDate, endDate, eventType, format = 'csv' } = req.query;
+        
+        // Build query
         const query = {};
         if (req.user?.tenantId) query.tenantId = req.user.tenantId;
-        if (startDate) query.createdAt = { $gte: new Date(startDate) };
-        if (endDate) query.createdAt = { ...query.createdAt, $lte: new Date(endDate) };
+        
+        // Date range filtering
+        if (startDate || endDate) {
+            query.createdAt = {};
+            if (startDate) query.createdAt.$gte = new Date(startDate);
+            if (endDate) query.createdAt.$lte = new Date(endDate);
+        }
+        
+        // Event type filtering
+        if (eventType) query.eventType = eventType;
 
-        const events = await AnalyticsEvent.find(query).sort({ createdAt: -1 }).limit(10000).lean();
+        // Fetch events (limit to 100K for performance)
+        const events = await AnalyticsEvent.find(query)
+            .sort({ createdAt: -1 })
+            .limit(100000)
+            .lean();
 
         if (format === 'csv') {
-            const headers = ['Date', 'Event Type', 'User ID', 'Page', 'Revenue', 'Device', 'Country'];
-            const rows = events.map(e => [
-                e.createdAt?.toISOString(), e.eventType, e.userId, e.page || '', e.revenue || 0, e.device?.type || '', e.geo?.country || '',
-            ]);
-            const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-            res.setHeader('Content-Type', 'text/csv');
-            res.setHeader('Content-Disposition', 'attachment; filename=analytics_export.csv');
+            // CSV Export using json2csv for proper formatting
+            const fields = [
+                { label: 'Date', value: 'createdAt' },
+                { label: 'Event Type', value: 'eventType' },
+                { label: 'User ID', value: 'userId' },
+                { label: 'Tenant ID', value: 'tenantId' },
+                { label: 'Page', value: 'page' },
+                { label: 'Revenue', value: 'revenue' },
+                { label: 'Device Type', value: 'device.type' },
+                { label: 'Browser', value: 'device.browser' },
+                { label: 'Country', value: 'geo.country' },
+                { label: 'City', value: 'geo.city' },
+                { label: 'IP Address', value: 'geo.ip' },
+                { label: 'Referrer', value: 'referrer' },
+                { label: 'Session ID', value: 'sessionId' },
+            ];
+
+            const parser = new Parser({ 
+                fields,
+                defaultValue: '',
+                transforms: [
+                    (item) => ({
+                        ...item,
+                        createdAt: item.createdAt ? new Date(item.createdAt).toISOString() : '',
+                        userId: item.userId ? item.userId.toString() : '',
+                        tenantId: item.tenantId ? item.tenantId.toString() : '',
+                        revenue: item.revenue || 0,
+                    })
+                ]
+            });
+            
+            const csv = parser.parse(events);
+            
+            const timestamp = new Date().toISOString().split('T')[0];
+            const filename = `analytics_export_${timestamp}.csv`;
+            
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
             return res.send(csv);
         }
 
@@ -128,10 +184,13 @@ export const exportData = async (req, res, next) => {
                 { header: 'Date', key: 'date', width: 24 },
                 { header: 'Event Type', key: 'eventType', width: 20 },
                 { header: 'User ID', key: 'userId', width: 24 },
+                { header: 'Tenant ID', key: 'tenantId', width: 24 },
                 { header: 'Page', key: 'page', width: 32 },
                 { header: 'Revenue', key: 'revenue', width: 12 },
                 { header: 'Device', key: 'device', width: 12 },
+                { header: 'Browser', key: 'browser', width: 16 },
                 { header: 'Country', key: 'country', width: 16 },
+                { header: 'City', key: 'city', width: 16 },
             ];
 
             events.forEach((e) => {
@@ -139,12 +198,18 @@ export const exportData = async (req, res, next) => {
                     date: e.createdAt?.toISOString(),
                     eventType: e.eventType,
                     userId: e.userId?.toString(),
+                    tenantId: e.tenantId?.toString(),
                     page: e.page || '',
                     revenue: e.revenue || 0,
                     device: e.device?.type || '',
+                    browser: e.device?.browser || '',
                     country: e.geo?.country || '',
+                    city: e.geo?.city || '',
                 });
             });
+
+            const timestamp = new Date().toISOString().split('T')[0];
+            const filename = `analytics_export_${timestamp}.xlsx`;
 
             res.setHeader(
                 'Content-Type',
@@ -152,15 +217,25 @@ export const exportData = async (req, res, next) => {
             );
             res.setHeader(
                 'Content-Disposition',
-                'attachment; filename=analytics_export.xlsx'
+                `attachment; filename="${filename}"`
             );
 
             await workbook.xlsx.write(res);
             return res.end();
         }
 
-        res.status(200).json({ success: true, data: { events } });
-    } catch (error) { next(error); }
+        // JSON format (default)
+        res.status(200).json({ 
+            success: true, 
+            data: { 
+                events,
+                count: events.length,
+                filters: { startDate, endDate, eventType }
+            } 
+        });
+    } catch (error) { 
+        next(error); 
+    }
 };
 
 export const getConversionFunnel = async (req, res, next) => {

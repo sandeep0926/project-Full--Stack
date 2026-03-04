@@ -1,13 +1,67 @@
 version: "3.9"
 
 services:
+  # Nginx Load Balancer
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: enterprise-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "8080:8080"
+    depends_on:
+      - gateway-1
+      - gateway-2
+    networks:
+      - enterprise-network
+
+  # API Gateway Instance 1
+  gateway-1:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: enterprise-gateway-1
+    restart: unless-stopped
+    environment:
+      PORT: 4000
+      MONOLITH_URL: http://server:3000
+      CLIENT_URL: http://localhost:5173
+      NODE_ENV: production
+    depends_on:
+      - server
+    networks:
+      - enterprise-network
+
+  # API Gateway Instance 2
+  gateway-2:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: enterprise-gateway-2
+    restart: unless-stopped
+    environment:
+      PORT: 4001
+      MONOLITH_URL: http://server:3000
+      CLIENT_URL: http://localhost:5173
+      NODE_ENV: production
+    depends_on:
+      - server
+    networks:
+      - enterprise-network
+
+  # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: enterprise-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
+    networks:
+      - enterprise-network
 
+  # Backend Server (Monolith)
   server:
     build:
       context: ./server
@@ -22,7 +76,10 @@ services:
       - "3000:3000"
     depends_on:
       - redis
+    networks:
+      - enterprise-network
 
+  # Frontend Client
   client:
     build:
       context: ./client
@@ -30,9 +87,15 @@ services:
     container_name: enterprise-client
     restart: unless-stopped
     environment:
-      # Frontend talks to API via docker host (dev) or same host in prod
-      VITE_API_BASE_URL: "/api/v1"
+      # Frontend now talks to Nginx load balancer
+      VITE_API_BASE_URL: "http://localhost/api/v1"
     ports:
       - "5173:5173"
     depends_on:
-      - server
+      - nginx
+    networks:
+      - enterprise-network
+
+networks:
+  enterprise-network:
+    driver: bridge
