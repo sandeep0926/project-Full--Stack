@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import GoogleCallbackPage from './pages/auth/GoogleCallbackPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import DocumentsPage from './pages/collaboration/DocumentsPage';
 import EditorPage from './pages/collaboration/EditorPage';
@@ -39,6 +40,7 @@ function AppRoutes() {
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
       <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
+      <Route path="/auth/callback" element={<GoogleCallbackPage />} />
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
@@ -51,6 +53,7 @@ function AppRoutes() {
         <Route path="settings" element={<SettingsPage />} />
         <Route path="settings/security" element={<SettingsPage />} />
         <Route path="settings/team" element={<SettingsPage />} />
+        <Route path="settings/billing" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

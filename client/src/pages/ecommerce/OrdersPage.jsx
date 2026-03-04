@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { orderService } from '../../services/services';
-import { Package, Clock, Truck, CheckCircle, XCircle, ChevronRight } from 'lucide-react';
+import { orderService, analyticsService } from '../../services/services';
+import { Package, Clock, Truck, CheckCircle, XCircle, ChevronRight, CreditCard } from 'lucide-react';
+import StripePayModal from '../../components/StripePayModal';
 
 const STATUS_CONFIG = {
     pending: { color: 'text-amber-600 bg-amber-50', icon: Clock, label: 'Pending' },
@@ -12,13 +13,25 @@ const STATUS_CONFIG = {
     returned: { color: 'text-gray-600 bg-gray-100', icon: XCircle, label: 'Returned' },
 };
 
+const PAYMENT_STATUS_CONFIG = {
+    pending: { color: 'text-amber-600 bg-amber-50', label: 'Payment Pending' },
+    processing: { color: 'text-blue-600 bg-blue-50', label: 'Processing' },
+    paid: { color: 'text-emerald-600 bg-emerald-50', label: 'Paid' },
+    failed: { color: 'text-red-600 bg-red-50', label: 'Failed' },
+};
+
 export default function OrdersPage() {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('');
     const [selectedOrder, setSelectedOrder] = useState(null);
+    const [payOrderId, setPayOrderId] = useState(null);
 
-    useEffect(() => { fetchOrders(); }, [statusFilter]);
+    useEffect(() => {
+        // Track orders page view
+        analyticsService.trackEvent({ eventType: 'page_view', page: '/ecommerce/orders' }).catch(() => { });
+        fetchOrders();
+    }, [statusFilter]);
 
     const fetchOrders = async () => {
         try { const { data } = await orderService.getAll({ status: statusFilter || undefined, limit: 50 }); setOrders(data.data.orders); }
@@ -60,7 +73,7 @@ export default function OrdersPage() {
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-gray-100 bg-gray-50/50">
-                                    {['Order', 'Customer', 'Items', 'Total', 'Status', 'Date', ''].map(h => (
+                                    {['Order', 'Customer', 'Items', 'Total', 'Payment', 'Status', 'Date', ''].map(h => (
                                         <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">{h}</th>
                                     ))}
                                 </tr>
@@ -74,6 +87,11 @@ export default function OrdersPage() {
                                             <td className="px-4 py-3"><p className="text-sm text-gray-800">{order.customer?.name || 'N/A'}</p><p className="text-xs text-gray-400">{order.customer?.email}</p></td>
                                             <td className="px-4 py-3 text-sm text-gray-600">{order.items?.length || 0} items</td>
                                             <td className="px-4 py-3 text-sm font-bold text-gray-900">${order.total?.toFixed(2)}</td>
+                                            <td className="px-4 py-3">
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${PAYMENT_STATUS_CONFIG[order.payment?.status || 'pending'].color}`}>
+                                                    {PAYMENT_STATUS_CONFIG[order.payment?.status || 'pending'].label}
+                                                </span>
+                                            </td>
                                             <td className="px-4 py-3"><span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${sc.color}`}><sc.icon className="w-3 h-3" /> {sc.label}</span></td>
                                             <td className="px-4 py-3 text-xs text-gray-400">{new Date(order.createdAt).toLocaleDateString()}</td>
                                             <td className="px-4 py-3"><ChevronRight className="w-4 h-4 text-gray-300" /></td>
@@ -114,8 +132,26 @@ export default function OrdersPage() {
                                     <span className="text-gray-900">Total</span><span className="gradient-text">${selectedOrder.total?.toFixed(2)}</span>
                                 </div>
                             </div>
+                            {selectedOrder.payment?.status !== 'paid' && selectedOrder.status !== 'canceled' && (
+                                <button type="button" onClick={() => setPayOrderId(selectedOrder._id)} className="mt-4 w-full py-2.5 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 flex items-center justify-center gap-2">
+                                    <CreditCard className="w-4 h-4" /> Pay with Stripe
+                                </button>
+                            )}
                         </div>
-                        <button onClick={() => setSelectedOrder(null)} className="mt-6 w-full py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 bg-gray-50 rounded-xl transition-colors">Close</button>
+                        <button onClick={() => { setSelectedOrder(null); setPayOrderId(null); }} className="mt-6 w-full py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 bg-gray-50 rounded-xl transition-colors">Close</button>
+                    </div>
+                </div>
+            )}
+
+            {payOrderId && (
+                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[60]" onClick={() => setPayOrderId(null)}>
+                    <div className="bg-white rounded-2xl w-full max-w-md shadow-xl border border-gray-100 animate-slide-up" onClick={e => e.stopPropagation()}>
+                        <StripePayModal
+                            orderId={payOrderId}
+                            orderTotal={selectedOrder?.total}
+                            onSuccess={() => { viewOrder(selectedOrder?._id); fetchOrders(); }}
+                            onClose={() => setPayOrderId(null)}
+                        />
                     </div>
                 </div>
             )}

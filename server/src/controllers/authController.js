@@ -1,7 +1,7 @@
 import User from '../models/User.js';
 import AuditLog from '../models/AuditLog.js';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken, generateSecureToken, hashToken } from '../utils/tokens.js';
-import { sendVerificationEmail, sendPasswordResetEmail, sendOTPEmail } from '../utils/email.js';
+import { sendVerificationEmail, sendPasswordResetEmail, sendOTPEmail, sendLoginNotificationEmail, sendWelcomeEmail } from '../utils/email.js';
 import { sendSms } from '../utils/sms.js';
 import { AuthenticationError, ValidationError, NotFoundError, ConflictError } from '../utils/errors.js';
 import speakeasy from 'speakeasy';
@@ -26,11 +26,18 @@ export const register = async (req, res, next) => {
         const verifyToken = generateSecureToken();
         user.emailVerificationToken = hashToken(verifyToken);
         user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        // Start session versioning at 1 for new users
+        user.tokenVersion = 1;
         await user.save();
 
         // Send verification email (non-blocking)
         sendVerificationEmail(user, verifyToken).catch((err) =>
             logger.error(`Verification email failed: ${err.message}`)
+        );
+
+        // Send welcome email (non-blocking)
+        sendWelcomeEmail(user).catch((err) =>
+            logger.error(`Welcome email failed: ${err.message}`)
         );
 
         // Generate tokens
@@ -135,7 +142,8 @@ export const login = async (req, res, next) => {
             });
         }
 
-        // Reset login attempts
+        // Invalidate other sessions and reset login attempts
+        user.tokenVersion += 1;
         await user.resetLoginAttempts();
 
         // Generate tokens
@@ -169,6 +177,14 @@ export const login = async (req, res, next) => {
             ip: req.ip,
             userAgent: req.get('user-agent'),
         });
+
+        // Send login notification email (non-blocking)
+        sendLoginNotificationEmail(user, {
+            ip: req.ip,
+            browser: req.get('user-agent'),
+        }).catch((err) =>
+            logger.error(`Login notification email failed: ${err.message}`)
+        );
 
         res.status(200).json({
             success: true,
@@ -218,6 +234,8 @@ export const verifyMFA = async (req, res, next) => {
         // Clear OTP
         user.otpCode = undefined;
         user.otpExpires = undefined;
+        // Invalidate other sessions and finalize login
+        user.tokenVersion += 1;
         await user.resetLoginAttempts();
 
         const accessToken = generateAccessToken(user);
@@ -505,6 +523,9 @@ export const revokeDevice = async (req, res, next) => {
 export const googleCallback = async (req, res, next) => {
     try {
         const user = req.user;
+        // Invalidate other sessions
+        user.tokenVersion = (user.tokenVersion || 0) + 1;
+        await user.save();
         const accessToken = generateAccessToken(user);
         const refreshToken = generateRefreshToken(user);
 
@@ -516,6 +537,14 @@ export const googleCallback = async (req, res, next) => {
             ip: req.ip,
             userAgent: req.get('user-agent'),
         });
+
+        // Send login notification email (non-blocking) for Google sign-in as well
+        sendLoginNotificationEmail(user, {
+            ip: req.ip,
+            browser: req.get('user-agent'),
+        }).catch((err) =>
+            logger.error(`Google login notification email failed: ${err.message}`)
+        );
 
         // Redirect to frontend with tokens
         res.redirect(

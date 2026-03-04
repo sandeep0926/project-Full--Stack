@@ -2,22 +2,17 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
-COPY src ./src
+# Copy dependency manifest and install production dependencies
+COPY package.json package-lock.json* ./
+RUN npm install --omit=dev
 
-RUN npm ci --only=production
+# Copy the rest of the server source
+COPY . .
 
 ENV NODE_ENV=production
-ENV PORT=5000
+ENV PORT=3000
 
-EXPOSE 5000
+EXPOSE 3000
 
 CMD ["node", "src/server.js"]
 
-FROM node:20-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY . .
-EXPOSE 5000
-CMD ["node", "src/server.js"]

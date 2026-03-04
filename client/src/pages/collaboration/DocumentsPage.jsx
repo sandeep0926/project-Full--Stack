@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { documentService } from '../../services/services';
+import { documentService, analyticsService } from '../../services/services';
 import { Plus, FileText, Search, Clock, Users, MoreVertical, Trash2, Share2 } from 'lucide-react';
 
 export default function DocumentsPage() {
@@ -12,7 +12,11 @@ export default function DocumentsPage() {
     const [menuOpen, setMenuOpen] = useState(null);
     const navigate = useNavigate();
 
-    useEffect(() => { fetchDocuments(); }, [search]);
+    useEffect(() => {
+        // Track documents page view
+        analyticsService.trackEvent({ eventType: 'page_view', page: '/collaboration' }).catch(() => {});
+        fetchDocuments();
+    }, [search]);
 
     const fetchDocuments = async () => {
         try {

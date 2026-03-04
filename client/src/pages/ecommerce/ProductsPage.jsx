@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { productService } from '../../services/services';
-import { Search, Plus, Star, ShoppingCart, Package, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { productService, orderService, analyticsService } from '../../services/services';
+import { Search, Plus, Star, ShoppingCart, Package, Trash2, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import StripePayModal from '../../components/StripePayModal';
 
 export default function ProductsPage() {
     const [products, setProducts] = useState([]);
@@ -12,9 +13,16 @@ export default function ProductsPage() {
     const [categories, setCategories] = useState([]);
     const [showCreate, setShowCreate] = useState(false);
     const [form, setForm] = useState({ name: '', description: '', price: '', category: '', sku: '', inventory: { quantity: 0 } });
+    const [checkoutOrder, setCheckoutOrder] = useState(null);
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [isProcessing, setIsProcessing] = useState(false);
     const { user } = useAuth();
 
-    useEffect(() => { fetchProducts(); }, [search, category, pagination.page]);
+    useEffect(() => {
+        // Track products page view
+        analyticsService.trackEvent({ eventType: 'page_view', page: '/ecommerce/products' }).catch(() => { });
+        fetchProducts();
+    }, [search, category, pagination.page]);
     useEffect(() => { fetchCategories(); }, []);
 
     const fetchProducts = async () => {
@@ -28,7 +36,7 @@ export default function ProductsPage() {
 
     const createProduct = async () => {
         try {
-            await productService.create({ ...form, price: parseFloat(form.price), inventory: { quantity: parseInt(form.inventory.quantity) } });
+            await productService.create({ ...form, price: parseFloat(form.price), inventory: { quantity: parseInt(form.inventory.quantity) }, status: 'active' });
             setShowCreate(false); setForm({ name: '', description: '', price: '', category: '', sku: '', inventory: { quantity: 0 } }); fetchProducts();
         } catch { }
     };
@@ -38,8 +46,117 @@ export default function ProductsPage() {
         try { await productService.delete(id); fetchProducts(); } catch { }
     };
 
+    const handleBuyNow = async (product) => {
+        if (isProcessing) return;
+        setIsProcessing(true);
+        try {
+            const orderData = {
+                items: [{ product: product._id, quantity: 1 }],
+                shippingAddress: {
+                    firstName: user?.name?.split(' ')[0] || 'Guest',
+                    lastName: user?.name?.split(' ')[1] || 'User',
+                    address1: '123 Test St',
+                    city: 'New York',
+                    postalCode: '10001',
+                    country: 'US'
+                },
+                payment: { method: 'stripe' }
+            };
+            const { data } = await orderService.create(orderData);
+            setCheckoutOrder(data.data.order);
+        } catch (err) {
+            alert(err.response?.data?.error?.message || 'Failed to create order');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     return (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6 animate-fade-in relative">
+            {/* Modals at the top for better stacking context */}
+            {selectedProduct && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[100] p-4" onClick={() => setSelectedProduct(null)}>
+                    <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl animate-slide-up" onClick={e => e.stopPropagation()}>
+                        <div className="flex flex-col md:flex-row">
+                            <div className="md:w-1/2 min-h-[300px] bg-gray-50 flex items-center justify-center overflow-hidden">
+                                {selectedProduct.images?.[0]?.url ? (
+                                    <img src={selectedProduct.images[0].url} alt={selectedProduct.name} className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="text-gray-300 flex flex-col items-center gap-2">
+                                        <Package className="w-20 h-20" />
+                                        <span className="text-sm font-medium">No Image Available</span>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="md:w-1/2 p-8 space-y-6">
+                                <div className="space-y-2">
+                                    <p className="text-xs font-bold text-primary uppercase tracking-widest">{selectedProduct.category || 'Uncategorized'}</p>
+                                    <h2 className="text-3xl font-extrabold text-gray-900">{selectedProduct.name}</h2>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex gap-0.5">
+                                            {[...Array(5)].map((_, i) => (
+                                                <Star key={i} className={`w-4 h-4 ${i < Math.round(selectedProduct.ratings?.average || 0) ? 'text-amber-400 fill-amber-400' : 'text-gray-200'}`} />
+                                            ))}
+                                        </div>
+                                        <span className="text-sm text-gray-500 font-medium">({selectedProduct.ratings?.count || 0} reviews)</span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="flex items-baseline gap-3">
+                                        <span className="text-4xl font-black text-gray-900">${(selectedProduct.price || 0).toFixed(2)}</span>
+                                        {selectedProduct.compareAtPrice > selectedProduct.price && (
+                                            <span className="text-lg text-gray-400 line-through">${selectedProduct.compareAtPrice.toFixed(2)}</span>
+                                        )}
+                                    </div>
+                                    <p className="text-gray-600 leading-relaxed text-sm">{selectedProduct.description || 'No description available for this product.'}</p>
+                                </div>
+
+                                <div className="space-y-3 pt-6 border-t border-gray-100">
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-gray-500 font-medium">Availability</span>
+                                        <span className={`font-bold ${selectedProduct.inventory?.quantity <= 10 ? 'text-red-500' : 'text-emerald-600'}`}>
+                                            {selectedProduct.inventory?.quantity || 0} in stock
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-gray-500 font-medium">SKU Reference</span>
+                                        <span className="font-mono font-bold text-gray-700">{selectedProduct.sku || 'N/A'}</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                                    <button
+                                        onClick={() => { handleBuyNow(selectedProduct); setSelectedProduct(null); }}
+                                        disabled={isProcessing || (selectedProduct.inventory?.quantity || 0) <= 0}
+                                        className="flex-[2] py-4 bg-accent-gradient text-white font-bold rounded-2xl hover:shadow-xl hover:shadow-primary/20 transition-all disabled:opacity-50"
+                                    >
+                                        Buy Now
+                                    </button>
+                                    <button onClick={() => setSelectedProduct(null)} className="flex-1 py-4 bg-gray-50 text-gray-600 font-bold rounded-2xl hover:bg-gray-100 transition-all">Close</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {checkoutOrder && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[110]" onClick={() => setCheckoutOrder(null)}>
+                    <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl animate-slide-up" onClick={e => e.stopPropagation()}>
+                        <StripePayModal
+                            orderId={checkoutOrder._id}
+                            orderTotal={checkoutOrder.total}
+                            onSuccess={() => {
+                                setCheckoutOrder(null);
+                                alert('Order placed successfully!');
+                            }}
+                            onClose={() => setCheckoutOrder(null)}
+                        />
+                    </div>
+                </div>
+            )}
+
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-extrabold tracking-tight text-gray-900">Products</h1>
@@ -110,7 +227,14 @@ export default function ProductsPage() {
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {products.map(product => (
-                        <div key={product._id} className="glass-card rounded-2xl overflow-hidden group hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-200/60 transition-all duration-300">
+                        <div
+                            key={product._id}
+                            onClick={() => {
+                                console.log('Product clicked:', product.name);
+                                setSelectedProduct(product);
+                            }}
+                            className="cursor-pointer glass-card rounded-2xl overflow-hidden group hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-200/60 transition-all duration-300"
+                        >
                             <div className="h-48 bg-gradient-to-br from-gray-50 to-gray-100 relative overflow-hidden">
                                 {product.images?.[0]?.url ? (
                                     <img src={product.images[0].url} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -124,7 +248,7 @@ export default function ProductsPage() {
                                 )}
                                 {['admin', 'superadmin'].includes(user?.role) && (
                                     <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => deleteProduct(product._id)} className="p-2 rounded-xl bg-white/90 shadow-sm text-gray-500 hover:text-red-500 transition-colors">
+                                        <button onClick={(e) => { e.stopPropagation(); deleteProduct(product._id); }} className="p-2 rounded-xl bg-white/90 shadow-sm text-gray-500 hover:text-red-500 transition-colors">
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </button>
                                     </div>
@@ -144,7 +268,13 @@ export default function ProductsPage() {
                                         <span className="text-lg font-extrabold text-gray-900">${product.price?.toFixed(2)}</span>
                                         {product.compareAtPrice > product.price && <span className="text-xs text-gray-400 line-through">${product.compareAtPrice?.toFixed(2)}</span>}
                                     </div>
-                                    <button className="p-2 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 transition-colors"><ShoppingCart className="w-4 h-4" /></button>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleBuyNow(product); }}
+                                        disabled={isProcessing || product.inventory?.quantity <= 0}
+                                        className="p-2 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
+                                    >
+                                        <ShoppingCart className="w-4 h-4" />
+                                    </button>
                                 </div>
                                 <div className="mt-3 pt-3 border-t border-gray-100">
                                     <div className={`text-[11px] font-medium ${product.inventory?.quantity <= 10 ? 'text-red-500' : 'text-emerald-600'}`}>

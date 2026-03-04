@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { authService, tenantService } from '../../services/services';
-import { Shield, Smartphone, Trash2, AlertTriangle, CheckCircle, Users, UserPlus, Crown } from 'lucide-react';
+import { authService, tenantService, billingService } from '../../services/services';
+import { Shield, Smartphone, Trash2, AlertTriangle, CheckCircle, Users, UserPlus, Crown, CreditCard } from 'lucide-react';
 
 export default function SettingsPage() {
     const { user, fetchUser } = useAuth();
+    const location = useLocation();
     const [activeTab, setActiveTab] = useState('security');
     const [devices, setDevices] = useState([]);
     const [mfaEnabled, setMfaEnabled] = useState(user?.mfaEnabled || false);
@@ -15,8 +17,24 @@ export default function SettingsPage() {
     const [inviteRole, setInviteRole] = useState('member');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
+    const [plans, setPlans] = useState([]);
+    const [billingLoading, setBillingLoading] = useState(false);
 
     useEffect(() => { fetchDevices(); fetchTenant(); }, []);
+
+    // Sync active tab with URL path
+    useEffect(() => {
+        if (location.pathname.endsWith('/settings/billing')) setActiveTab('billing');
+        else if (location.pathname.endsWith('/settings/team')) setActiveTab('team');
+        else if (location.pathname.endsWith('/settings/security')) setActiveTab('security');
+        else setActiveTab('account');
+    }, [location.pathname]);
+
+    useEffect(() => {
+        if (activeTab === 'billing' && ['admin', 'superadmin'].includes(user?.role)) {
+            billingService.getPlans().then(({ data }) => setPlans(data.data.plans || [])).catch(() => {});
+        }
+    }, [activeTab, user?.role]);
 
     const fetchDevices = async () => { try { const { data } = await authService.getDevices(); setDevices(data.data.devices); } catch { } };
     const fetchTenant = async () => { try { const { data } = await tenantService.getCurrent(); setTenant(data.data.tenant); setMembers(data.data.tenant?.members || []); } catch { } };
@@ -45,6 +63,21 @@ export default function SettingsPage() {
         try { await tenantService.removeMember(userId); fetchTenant(); setMessage('Member removed'); } catch { }
     };
 
+    const startCheckout = async (planId) => {
+        if (!planId || plans.find(p => p.id === planId)?.stripePriceId == null) return;
+        setBillingLoading(true);
+        try {
+            const base = window.location.origin;
+            const { data } = await billingService.createCheckoutSession(planId, `${base}/settings/billing?success=1`, `${base}/settings/billing?cancel=1`);
+            if (data.data?.url) window.location.href = data.data.url;
+            else setMessage('Checkout URL not returned');
+        } catch (err) {
+            setMessage(err.response?.data?.error?.message || 'Checkout failed');
+        } finally {
+            setBillingLoading(false);
+        }
+    };
+
     return (
         <div className="space-y-6 animate-fade-in">
             <div>
@@ -60,8 +93,13 @@ export default function SettingsPage() {
             )}
 
             <div className="flex gap-1 border-b border-gray-200">
-                {['security', 'team', 'account'].map(tab => (
-                    <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2.5 text-sm font-medium capitalize transition-all ${activeTab === tab ? 'text-primary border-b-2 border-primary' : 'text-gray-400 hover:text-gray-700'}`}>{tab}</button>
+                {[
+                    { id: 'security', label: 'Security' },
+                    { id: 'team', label: 'Team' },
+                    { id: 'account', label: 'Account' },
+                    ...(['admin', 'superadmin'].includes(user?.role) ? [{ id: 'billing', label: 'Billing' }] : []),
+                ].map(({ id, label }) => (
+                    <button key={id} onClick={() => setActiveTab(id)} className={`px-4 py-2.5 text-sm font-medium capitalize transition-all ${activeTab === id ? 'text-primary border-b-2 border-primary' : 'text-gray-400 hover:text-gray-700'}`}>{label}</button>
                 ))}
             </div>
 
@@ -134,6 +172,30 @@ export default function SettingsPage() {
                                 </div>
                             ))}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'billing' && (
+                <div className="space-y-6">
+                    <div className="glass-card rounded-2xl p-6">
+                        <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2"><CreditCard className="w-5 h-5 text-primary" /> Subscription plans</h3>
+                        <p className="text-sm text-gray-500 mb-6">Upgrade your plan to unlock more features. You will be redirected to Stripe Checkout to pay securely.</p>
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            {plans.filter(p => p.id !== 'free').map((plan) => (
+                                <div key={plan.id} className="p-4 rounded-xl border border-gray-200 bg-white hover:border-primary/30 transition-colors">
+                                    <p className="font-semibold text-gray-900">{plan.name}</p>
+                                    <p className="text-2xl font-bold text-primary mt-1">${plan.price}<span className="text-sm font-normal text-gray-500">/mo</span></p>
+                                    <ul className="mt-3 space-y-1 text-xs text-gray-600">
+                                        {(plan.features || []).slice(0, 4).map((f, i) => <li key={i}>• {f.replace(/_/g, ' ')}</li>)}
+                                    </ul>
+                                    {plan.stripePriceId && (
+                                        <button onClick={() => startCheckout(plan.id)} disabled={billingLoading} className="mt-4 w-full py-2 rounded-xl text-sm font-semibold bg-primary text-white hover:bg-primary/90 disabled:opacity-50">Subscribe with Stripe</button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        {plans.length === 0 && !billingLoading && <p className="text-sm text-gray-500">No billable plans available.</p>}
                     </div>
                 </div>
             )}

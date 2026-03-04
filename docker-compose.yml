@@ -1,99 +1,38 @@
-version: '3.9'
+version: "3.9"
 
 services:
-  mongo:
-    image: mongo:7
-    restart: unless-stopped
-    ports:
-      - '27017:27017'
-    volumes:
-      - mongo-data:/data/db
-
   redis:
     image: redis:7-alpine
+    container_name: enterprise-redis
     restart: unless-stopped
-    ports:
-      - '6379:6379'
-
-  server:
-    build: ./server
-    restart: unless-stopped
-    env_file:
-      - ./server/.env
-    environment:
-      - MONGO_URI=mongodb://mongo:27017/enterprise-platform
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    ports:
-      - '5000:5000'
-    depends_on:
-      - mongo
-      - redis
-
-volumes:
-  mongo-data:
-
-version: '3.8'
-
-services:
-  mongodb:
-    image: mongo:7
-    container_name: enterprise_mongodb
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-    networks:
-      - app_network
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    container_name: enterprise_redis
     ports:
       - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - app_network
-    restart: unless-stopped
 
   server:
     build:
       context: ./server
       dockerfile: Dockerfile
-    container_name: enterprise_server
-    ports:
-      - "5000:5000"
-    environment:
-      - NODE_ENV=production
-      - MONGODB_URI=mongodb://mongodb:27017/enterprise_platform
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    depends_on:
-      - mongodb
-      - redis
-    networks:
-      - app_network
+    container_name: enterprise-server
     restart: unless-stopped
+    env_file:
+      - ./server/.env
+    environment:
+      REDIS_HOST: redis
+    ports:
+      - "3000:3000"
+    depends_on:
+      - redis
 
   client:
     build:
       context: ./client
       dockerfile: Dockerfile
-    container_name: enterprise_client
+    container_name: enterprise-client
+    restart: unless-stopped
+    environment:
+      # Frontend talks to API via docker host (dev) or same host in prod
+      VITE_API_BASE_URL: "/api/v1"
     ports:
-      - "80:80"
+      - "5173:5173"
     depends_on:
       - server
-    networks:
-      - app_network
-    restart: unless-stopped
-
-volumes:
-  mongo_data:
-  redis_data:
-
-networks:
-  app_network:
-    driver: bridge

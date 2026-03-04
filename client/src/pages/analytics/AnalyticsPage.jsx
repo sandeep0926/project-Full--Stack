@@ -15,7 +15,14 @@ export default function AnalyticsPage() {
     const [exporting, setExporting] = useState(false);
     const intervalRef = useRef(null);
 
-    useEffect(() => { fetchDashboard(); fetchFunnel(); startRealtime(); return () => { if (intervalRef.current) clearInterval(intervalRef.current); }; }, [period]);
+    useEffect(() => {
+        // Track analytics page view
+        analyticsService.trackEvent({ eventType: 'page_view', page: '/analytics' }).catch(() => {});
+        fetchDashboard();
+        fetchFunnel();
+        startRealtime();
+        return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+    }, [period]);
 
     const fetchDashboard = async () => { try { const { data } = await analyticsService.getDashboard({ period }); setDashboard(data.data); } catch { } finally { setLoading(false); } };
     const fetchFunnel = async () => { try { const { data } = await analyticsService.getFunnel({ period }); setFunnel(data.data.funnel); } catch { }; };
@@ -165,22 +172,64 @@ export default function AnalyticsPage() {
 
             {activeTab === 'funnel' && (
                 <div className="glass-card rounded-2xl p-6">
-                    <h3 className="text-base font-semibold text-gray-900 mb-6">Conversion Funnel</h3>
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 className="text-base font-semibold text-gray-900">Conversion Funnel</h3>
+                            <p className="text-xs text-gray-500 mt-0.5">From page views to purchases</p>
+                        </div>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-primary/5 text-primary">
+                            {period.toUpperCase()} window
+                        </span>
+                    </div>
+
                     <div className="space-y-4">
                         {funnelStages.map((stage, i) => {
-                            const data = funnel?.find(f => f._id === stage.key);
+                            const data = funnel?.find((f) => f._id === stage.key);
                             const count = data?.count || 0;
-                            const maxCount = Math.max(...(funnel || []).map(f => f.count || 0), 1);
+                            const maxCount = Math.max(...(funnel || []).map((f) => f.count || 0), 1);
                             const pct = maxCount > 0 ? (count / maxCount) * 100 : 0;
-                            const prev = i > 0 ? funnel?.find(f => f._id === funnelStages[i - 1].key) : null;
-                            const convRate = prev?.count > 0 ? ((count / prev.count) * 100).toFixed(1) : '100';
+                            const prev = i > 0 ? funnel?.find((f) => f._id === funnelStages[i - 1].key) : null;
+                            const convRate =
+                                prev?.count > 0 ? ((count / prev.count) * 100).toFixed(1) : '—';
+
                             return (
-                                <div key={stage.key} className="animate-slide-up" style={{ animationDelay: `${i * 100}ms` }}>
+                                <div
+                                    key={stage.key}
+                                    className="group rounded-2xl border border-gray-100 bg-gradient-to-r from-white to-gray-50/60 hover:from-primary/3 hover:to-secondary/5 transition-all duration-300 p-3 shadow-sm hover:shadow-md animate-slide-up"
+                                    style={{ animationDelay: `${i * 80}ms` }}
+                                >
                                     <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-2"><stage.icon className="w-4 h-4 text-primary" /><span className="text-sm font-medium text-gray-800">{stage.name}</span></div>
-                                        <div className="flex items-center gap-3"><span className="text-sm font-bold text-gray-900">{count.toLocaleString()}</span>{i > 0 && <span className="text-xs text-gray-400">{convRate}% conv.</span>}</div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 rounded-xl bg-primary/5 text-primary flex items-center justify-center">
+                                                <stage.icon className="w-4 h-4" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-semibold text-gray-900">
+                                                    {stage.name}
+                                                </p>
+                                                <p className="text-[11px] text-gray-400 capitalize">
+                                                    {stage.key.replace(/_/g, ' ')}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-bold text-gray-900">
+                                                {count.toLocaleString()}
+                                            </p>
+                                            {i > 0 && (
+                                                <p className="text-[11px] text-gray-400">
+                                                    {convRate === '—' ? 'No data' : `${convRate}% from previous`}
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="h-8 bg-gray-100 rounded-xl overflow-hidden"><div className="h-full rounded-xl bg-gradient-to-r from-primary to-secondary transition-all duration-700" style={{ width: `${pct}%` }} /></div>
+
+                                    <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full rounded-full bg-gradient-to-r from-primary via-secondary to-primary transition-all duration-700 group-hover:shadow-[0_0_0_1px_rgba(129,140,248,0.35)]"
+                                            style={{ width: `${pct}%` }}
+                                        />
+                                    </div>
                                 </div>
                             );
                         })}

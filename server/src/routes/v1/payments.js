@@ -6,8 +6,7 @@ const router = express.Router();
 
 router.post('/create-payment-intent', authenticate, payment.createPaymentIntent);
 
-// Stripe webhook (no auth; Stripe signs requests)
-router.post('/webhook', express.json({ type: 'application/json' }), payment.handleWebhook);
+// Webhook is registered in server.js with express.raw() for signature verification
 
 export default router;
 

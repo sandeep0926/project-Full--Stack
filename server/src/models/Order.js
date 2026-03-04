@@ -6,6 +6,7 @@ const orderSchema = new mongoose.Schema(
             type: String,
             required: true,
             unique: true,
+            default: () => `ORD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
         },
         customer: {
             type: mongoose.Schema.Types.ObjectId,

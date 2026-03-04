@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
-import { documentService } from '../../services/services';
+import { documentService, analyticsService } from '../../services/services';
 import { useAuth } from '../../context/AuthContext';
 import { ArrowLeft, Save, Clock, Share2, Check, Wifi, WifiOff } from 'lucide-react';
 
@@ -23,6 +23,11 @@ export default function EditorPage() {
     const saveTimerRef = useRef(null);
 
     useEffect(() => {
+        // Track editor page view
+        analyticsService
+            .trackEvent({ eventType: 'page_view', page: `/collaboration/${id}` })
+            .catch(() => {});
+
         fetchDocument();
         connectSocket();
         return () => {
@@ -41,7 +46,7 @@ export default function EditorPage() {
     };
 
     const connectSocket = () => {
-        const token = localStorage.getItem('accessToken');
+        const token = sessionStorage.getItem('accessToken');
         const socket = io(window.location.origin, { auth: { token }, transports: ['websocket'] });
         socketRef.current = socket;
         socket.on('connect', () => { setConnected(true); socket.emit('join-document', id); });

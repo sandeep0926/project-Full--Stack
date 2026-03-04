@@ -53,6 +53,16 @@ export const orderService = {
     cancel: (id, reason) => api.put(`/orders/${id}/cancel`, { reason }),
 };
 
+export const paymentService = {
+    createPaymentIntent: (orderId) => api.post('/payments/create-payment-intent', { orderId }),
+};
+
+export const billingService = {
+    getPlans: () => api.get('/billing/plans'),
+    createCheckoutSession: (plan, successUrl, cancelUrl) =>
+        api.post('/billing/checkout-session', { plan, successUrl, cancelUrl }),
+};
+
 export const analyticsService = {
     trackEvent: (data) => api.post('/analytics/events', data),
     getDashboard: (params) => api.get('/analytics/dashboard', { params }),

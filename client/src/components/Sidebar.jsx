@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import {
     LayoutDashboard, FileText, ShoppingCart, BarChart3, Shield,
     Users, Settings, LogOut, Package, ClipboardList,
-    Zap
+    Zap, CreditCard
 } from 'lucide-react';
 
 const navItems = [
@@ -23,8 +23,9 @@ const navItems = [
     {
         section: 'Admin', items: [
             { to: '/settings/team', icon: Users, label: 'Team', roles: ['admin', 'superadmin'] },
-            { to: '/settings/security', icon: Shield, label: 'Security' },
-            { to: '/settings', icon: Settings, label: 'Settings' },
+            { to: '/settings/security', icon: Shield, label: 'Security', roles: ['admin', 'superadmin'] },
+            { to: '/settings/billing', icon: CreditCard, label: 'Billing', roles: ['admin', 'superadmin'] },
+            { to: '/settings', icon: Settings, label: 'Settings', roles: ['admin', 'superadmin'] },
         ]
     },
 ];
@@ -53,34 +54,41 @@ export default function Sidebar({ isOpen, onClose }) {
                 {/* Navigation */}
                 <nav className="flex-1 px-3 py-4 overflow-y-auto">
                     {navItems.map((section) => (
-                        <div key={section.section} className="mb-6">
-                            <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-widest text-gray-400">
-                                {section.section}
-                            </p>
-                            {section.items
-                                .filter(item => !item.roles || item.roles.includes(user?.role))
-                                .map((item) => (
-                                    <NavLink
-                                        key={item.to}
-                                        to={item.to}
-                                        onClick={onClose}
-                                        className={({ isActive }) =>
-                                            `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 ${isActive
-                                                ? 'bg-primary/8 text-primary shadow-sm'
-                                                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-                                            }`
-                                        }
-                                    >
-                                        <item.icon className="w-[18px] h-[18px] flex-shrink-0" />
-                                        <span>{item.label}</span>
-                                        {item.badge && (
-                                            <span className="ml-auto text-[10px] font-bold bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">
-                                                {item.badge}
-                                            </span>
-                                        )}
-                                    </NavLink>
-                                ))}
-                        </div>
+                        (() => {
+                            const visibleItems = section.items.filter(
+                                (item) => !item.roles || item.roles.includes(user?.role)
+                            );
+                            if (visibleItems.length === 0) return null;
+                            return (
+                                <div key={section.section} className="mb-6">
+                                    <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+                                        {section.section}
+                                    </p>
+                                    {visibleItems.map((item) => (
+                                        <NavLink
+                                            key={item.to}
+                                            to={item.to}
+                                            onClick={onClose}
+                                            className={({ isActive }) =>
+                                                `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 ${
+                                                    isActive
+                                                        ? 'bg-primary/8 text-primary shadow-sm'
+                                                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                                                }`
+                                            }
+                                        >
+                                            <item.icon className="w-[18px] h-[18px] flex-shrink-0" />
+                                            <span>{item.label}</span>
+                                            {item.badge && (
+                                                <span className="ml-auto text-[10px] font-bold bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">
+                                                    {item.badge}
+                                                </span>
+                                            )}
+                                        </NavLink>
+                                    ))}
+                                </div>
+                            );
+                        })()
                     ))}
                 </nav>
 

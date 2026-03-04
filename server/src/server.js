@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import http from 'http';
+
 import { Server } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import Redis from 'ioredis';
@@ -12,7 +13,6 @@ import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import mongoSanitize from 'express-mongo-sanitize';
 import swaggerUi from 'swagger-ui-express';
-import swaggerJsdoc from 'swagger-jsdoc';
 import { setupRecurringJobs } from './jobs/queues.js';
 
 import connectDB from './config/database.js';
@@ -33,8 +33,16 @@ import analyticsRoutes from './routes/v1/analytics.js';
 import billingRoutes from './routes/v1/billing.js';
 import paymentRoutes from './routes/v1/payments.js';
 import v2Routes from './routes/v2/index.js';
+import paymentController from './controllers/paymentController.js';
 
 const app = express();
+
+// Stripe webhook must receive raw body for signature verification – register before express.json()
+app.post(
+    '/api/v1/payments/webhook',
+    express.raw({ type: 'application/json' }),
+    paymentController.handleWebhook
+);
 const server = http.createServer(app);
 
 // Socket.io setup
@@ -95,22 +103,121 @@ app.use(passportConfig.initialize());
 // Rate limiting
 app.use('/api/', apiLimiter);
 
-// Swagger
-try {
-    const swaggerSpec = swaggerJsdoc({
-        definition: {
-            openapi: '3.0.0',
-            info: { title: 'Enterprise Platform API', version: '1.0.0', description: 'Full-stack enterprise platform API documentation' },
-            servers: [{ url: `http://localhost:${process.env.PORT || 5000}` }],
-            components: {
-                securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } },
-            },
-            security: [{ bearerAuth: [] }],
+// Swagger – use static OpenAPI spec so docs always show (no JSDoc scan dependency)
+const baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+const openApiSpec = {
+    openapi: '3.0.0',
+    info: { title: 'Enterprise Platform API', version: '1.0.0', description: 'Full-stack enterprise platform API documentation' },
+    servers: [{ url: baseUrl }],
+    components: {
+        securitySchemes: {
+            bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
         },
-        apis: ['./src/routes/**/*.js'],
-    });
-    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customSiteTitle: 'Enterprise Platform API' }));
-} catch (e) { logger.warn('Swagger not configured'); }
+    },
+    security: [{ bearerAuth: [] }],
+    paths: {
+        '/api/v1/auth/register': {
+            post: {
+                tags: ['Auth'],
+                summary: 'Register a new user',
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                required: ['name', 'email', 'password'],
+                                properties: { name: { type: 'string' }, email: { type: 'string', format: 'email' }, password: { type: 'string' } },
+                            },
+                        },
+                    },
+                },
+                responses: { 201: { description: 'User registered' }, 409: { description: 'Email already exists' } },
+            },
+        },
+        '/api/v1/auth/login': {
+            post: {
+                tags: ['Auth'],
+                summary: 'Login with email and password',
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                required: ['email', 'password'],
+                                properties: { email: { type: 'string', format: 'email' }, password: { type: 'string' } },
+                            },
+                        },
+                    },
+                },
+                responses: { 200: { description: 'Logged in' }, 401: { description: 'Invalid credentials' } },
+            },
+        },
+        '/api/v1/auth/me': {
+            get: {
+                tags: ['Auth'],
+                summary: 'Get current user',
+                security: [{ bearerAuth: [] }],
+                responses: { 200: { description: 'Current user' }, 401: { description: 'Unauthorized' } },
+            },
+        },
+        '/api/v1/auth/refresh-token': {
+            post: {
+                tags: ['Auth'],
+                summary: 'Refresh access token',
+                requestBody: {
+                    content: { 'application/json': { schema: { type: 'object', properties: { refreshToken: { type: 'string' } } } } },
+                },
+                responses: { 200: { description: 'New tokens' }, 401: { description: 'Invalid refresh token' } },
+            },
+        },
+        '/api/v1/products': {
+            get: {
+                tags: ['Products'],
+                summary: 'List products',
+                parameters: [
+                    { name: 'page', in: 'query', schema: { type: 'integer' } },
+                    { name: 'limit', in: 'query', schema: { type: 'integer' } },
+                    { name: 'search', in: 'query', schema: { type: 'string' } },
+                    { name: 'category', in: 'query', schema: { type: 'string' } },
+                ],
+                responses: { 200: { description: 'List of products' } },
+            },
+        },
+        '/api/v1/orders': {
+            get: {
+                tags: ['Orders'],
+                summary: 'List orders',
+                security: [{ bearerAuth: [] }],
+                parameters: [
+                    { name: 'page', in: 'query', schema: { type: 'integer' } },
+                    { name: 'status', in: 'query', schema: { type: 'string' } },
+                ],
+                responses: { 200: { description: 'List of orders' }, 401: { description: 'Unauthorized' } },
+            },
+        },
+        '/health': {
+            get: {
+                tags: ['Health'],
+                summary: 'Health check',
+                security: [],
+                responses: { 200: { description: 'OK' } },
+            },
+        },
+    },
+};
+// Serve OpenAPI spec at a path that does NOT start with /api-docs (so app.use('/api-docs') doesn't catch it)
+app.get('/openapi.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.json(openApiSpec);
+});
+// Serve OpenAPI UI – use static object directly for reliability
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, {
+    customSiteTitle: 'Enterprise API Documentation',
+}));
+
+logger.info('Swagger UI available at /api-docs');
 
 // API Routes v1
 app.use('/api/v1/auth', authRoutes);

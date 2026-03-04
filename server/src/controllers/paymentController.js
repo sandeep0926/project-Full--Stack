@@ -13,11 +13,17 @@ const createPaymentIntent = async (req, res, next) => {
             throw new AuthenticationError('Please login first');
         }
 
-        const order = await Order.findOne({
+        const query = {
             _id: orderId,
             customer: req.user._id,
-            tenantId: req.user.tenantId,
-        });
+        };
+        if (req.user.tenantId) {
+            query.tenantId = req.user.tenantId;
+        } else {
+            query.$or = [{ tenantId: null }, { tenantId: { $exists: false } }];
+        }
+
+        const order = await Order.findOne(query);
 
         if (!order) {
             throw new NotFoundError('Order');
@@ -60,9 +66,20 @@ const createPaymentIntent = async (req, res, next) => {
 };
 
 const handleWebhook = async (req, res) => {
-    let event = req.body;
+    const sig = req.headers['stripe-signature'];
+    const rawBody = req.body; // Buffer when route uses express.raw()
+    let event;
+    if (process.env.STRIPE_WEBHOOK_SECRET && sig) {
+        try {
+            event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
+        } catch (err) {
+            logger.error(`Stripe webhook signature verification failed: ${err.message}`);
+            return res.status(400).send(`Webhook signature verification failed: ${err.message}`);
+        }
+    } else {
+        event = typeof rawBody === 'object' && !Buffer.isBuffer(rawBody) ? rawBody : JSON.parse(rawBody.toString());
+    }
 
-    // In production, verify the Stripe signature using the raw body and STRIPE_WEBHOOK_SECRET.
     try {
         switch (event.type) {
             case 'payment_intent.succeeded': {

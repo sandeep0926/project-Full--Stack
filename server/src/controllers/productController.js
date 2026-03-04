@@ -56,14 +56,19 @@ export const getProducts = async (req, res, next) => {
         } = req.query;
 
         const cacheKey = `products:${JSON.stringify(req.query)}:${req.user?.tenantId || 'public'}`;
-        const cached = await cacheGet(cacheKey);
+        // Skip cache for authenticated users so newly added products show immediately
+        const cached = req.user?.tenantId ? null : await cacheGet(cacheKey);
         if (cached) {
             return res.status(200).json({ success: true, data: cached });
         }
 
         const query = { status };
 
-        if (req.tenantFilter) {
+        // Logged-in users with a tenant see only their tenant's products (so newly added products show)
+        const tenantId = req.user?.tenantId && (req.user.tenantId._id || req.user.tenantId);
+        if (tenantId) {
+            query.tenantId = tenantId;
+        } else if (req.tenantFilter) {
             Object.assign(query, req.tenantFilter);
         }
 

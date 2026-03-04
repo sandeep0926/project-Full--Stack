@@ -22,6 +22,10 @@ passport.use(
             if (user.isLocked) {
                 return done(null, false, { message: 'Account is locked' });
             }
+            // Single-session enforcement: reject tokens from older sessions
+            if ((payload.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) {
+                return done(null, false, { message: 'Session expired. Please login again.' });
+            }
             return done(null, user);
         } catch (error) {
             return done(error, false);

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { authService } from '../services/services';
+import { authService, analyticsService } from '../services/services';
 
 const AuthContext = createContext(null);
 
@@ -15,13 +15,13 @@ export const AuthProvider = ({ children }) => {
 
     const fetchUser = useCallback(async () => {
         try {
-            const token = localStorage.getItem('accessToken');
+            const token = sessionStorage.getItem('accessToken');
             if (!token) { setLoading(false); return; }
             const { data } = await authService.getMe();
             setUser(data.data.user);
         } catch {
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
+            sessionStorage.removeItem('accessToken');
+            sessionStorage.removeItem('refreshToken');
             setUser(null);
         } finally {
             setLoading(false);
@@ -33,36 +33,42 @@ export const AuthProvider = ({ children }) => {
     const login = async (credentials) => {
         const { data } = await authService.login(credentials);
         if (data.data.requiresMFA) return data.data;
-        localStorage.setItem('accessToken', data.data.accessToken);
-        localStorage.setItem('refreshToken', data.data.refreshToken);
+        sessionStorage.setItem('accessToken', data.data.accessToken);
+        sessionStorage.setItem('refreshToken', data.data.refreshToken);
         setUser(data.data.user);
+        // Track successful login
+        analyticsService.trackEvent({ eventType: 'user_login' }).catch(() => {});
         return data.data;
     };
 
     const register = async (userData) => {
         const { data } = await authService.register(userData);
-        localStorage.setItem('accessToken', data.data.accessToken);
-        localStorage.setItem('refreshToken', data.data.refreshToken);
+        sessionStorage.setItem('accessToken', data.data.accessToken);
+        sessionStorage.setItem('refreshToken', data.data.refreshToken);
         setUser(data.data.user);
+        // Track signup event
+        analyticsService.trackEvent({ eventType: 'user_signup' }).catch(() => {});
         return data.data;
     };
 
     const verifyMFA = async (mfaData) => {
         const { data } = await authService.verifyMFA(mfaData);
-        localStorage.setItem('accessToken', data.data.accessToken);
-        localStorage.setItem('refreshToken', data.data.refreshToken);
+        sessionStorage.setItem('accessToken', data.data.accessToken);
+        sessionStorage.setItem('refreshToken', data.data.refreshToken);
         setUser(data.data.user);
+        // Track login completed after MFA
+        analyticsService.trackEvent({ eventType: 'user_login' }).catch(() => {});
         return data.data;
     };
 
     const logout = async () => {
         try {
-            const deviceId = localStorage.getItem('deviceId');
+            const deviceId = sessionStorage.getItem('deviceId');
             await authService.logout(deviceId);
         } catch { /* ignore */ }
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('deviceId');
+        sessionStorage.removeItem('accessToken');
+        sessionStorage.removeItem('refreshToken');
+        sessionStorage.removeItem('deviceId');
         setUser(null);
     };
 

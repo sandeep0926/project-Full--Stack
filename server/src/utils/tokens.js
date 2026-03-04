@@ -8,6 +8,7 @@ const generateAccessToken = (user) => {
             email: user.email,
             role: user.role,
             tenantId: user.tenantId,
+            tokenVersion: user.tokenVersion || 0,
         },
         process.env.JWT_SECRET,
         { expiresIn: process.env.JWT_EXPIRE || '15m' }

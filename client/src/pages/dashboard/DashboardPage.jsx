@@ -13,6 +13,9 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // Track dashboard page view
+        analyticsService.trackEvent({ eventType: 'page_view', page: '/dashboard' }).catch(() => {});
+
         const fetchData = async () => {
             try {
                 const [analyticsRes] = await Promise.allSettled([
