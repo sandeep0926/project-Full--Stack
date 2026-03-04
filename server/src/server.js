@@ -220,6 +220,11 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, {
 
 logger.info('Swagger UI available at /api-docs');
 
+// Health check - MUST be before other routes
+app.get('/health', (req, res) => {
+    res.json({ success: true, data: { status: 'healthy', uptime: process.uptime(), timestamp: new Date().toISOString(), version: '1.0.0' } });
+});
+
 // API Routes v1
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/tenants', tenantRoutes);
@@ -232,11 +237,6 @@ app.use('/api/v1/payments', paymentRoutes);
 
 // API Routes v2
 app.use('/api/v2', v2Routes);
-
-// Health check
-app.get('/health', (req, res) => {
-    res.json({ success: true, data: { status: 'healthy', uptime: process.uptime(), timestamp: new Date().toISOString(), version: '1.0.0' } });
-});
 
 // Error handling
 app.use(notFound);
